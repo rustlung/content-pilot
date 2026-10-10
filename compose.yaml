@@ -1,0 +1,62 @@
+services:
+  content-pilot-db:
+    image: postgres:16-alpine
+    container_name: content-pilot-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-content_pilot}
+      POSTGRES_USER: ${POSTGRES_USER:-content_pilot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - content-pilot-postgres-data:/var/lib/postgresql/data
+    networks:
+      - content-pilot-network
+
+  content-pilot-redis:
+    image: redis:7-alpine
+    container_name: content-pilot-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - content-pilot-network
+
+  content-pilot-api:
+    build: .
+    container_name: content-pilot-api
+    environment:
+      APP_NAME: ${APP_NAME:-ContentPilot}
+      APP_ENV: ${APP_ENV:-development}
+      APP_DEBUG: ${APP_DEBUG:-true}
+      POSTGRES_HOST: content-pilot-db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-content_pilot}
+      POSTGRES_USER: ${POSTGRES_USER:-content_pilot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me}
+      REDIS_HOST: content-pilot-redis
+      REDIS_PORT: 6379
+    command: uvicorn content_pilot.app:create_app --factory --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      content-pilot-db:
+        condition: service_healthy
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./src:/app/src
+      - ./alembic:/app/alembic
+      - ./alembic.ini:/app/alembic.ini:ro
+    networks:
+      - content-pilot-network
+
+volumes:
+  content-pilot-postgres-data:
+
+networks:
+  content-pilot-network:
+    name: content-pilot-network
