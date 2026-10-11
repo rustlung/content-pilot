@@ -3,8 +3,9 @@ from __future__ import annotations
 
 from functools import cached_property
 from pathlib import Path
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL
 
@@ -17,6 +18,7 @@ class Settings(BaseSettings):
     app_name: str = "ContentPilot"
     app_env: str = "development"
     app_debug: bool = True
+    app_timezone: str = "Europe/Samara"
 
     postgres_host: str = "content-pilot-db"
     postgres_port: int = Field(default=5432, ge=1, le=65535)
@@ -34,6 +36,19 @@ class Settings(BaseSettings):
     ai_image_model: str = "openai/gpt-image-1-mini"
     ai_timeout_seconds: int = Field(default=60, ge=1, le=300)
     media_root: Path = Path("data/media")
+
+    @field_validator("app_timezone")
+    @classmethod
+    def validate_app_timezone(cls, value: str) -> str:
+        try:
+            ZoneInfo(value)
+        except ZoneInfoNotFoundError as error:
+            raise ValueError("APP_TIMEZONE must be a valid IANA timezone") from error
+        return value
+
+    @cached_property
+    def timezone(self) -> ZoneInfo:
+        return ZoneInfo(self.app_timezone)
 
     @cached_property
     def sqlalchemy_database_url(self) -> str:

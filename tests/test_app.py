@@ -2,11 +2,11 @@
 from fastapi.testclient import TestClient
 
 
-def test_root_renders_starter_page(client: TestClient) -> None:
+def test_root_renders_dashboard(client: TestClient) -> None:
     response = client.get("/")
     assert response.status_code == 200
     assert "ContentPilot Test" in response.text
-    assert "Status: running" in response.text
+    assert "Панель управления" in response.text
 
 
 def test_health(client: TestClient) -> None:

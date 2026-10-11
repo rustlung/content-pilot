@@ -14,3 +14,9 @@ def test_settings_builds_database_url() -> None:
 def test_settings_requires_postgres_password() -> None:
     with pytest.raises(ValidationError):
         Settings(postgres_password=None)  # type: ignore[arg-type]
+
+
+def test_settings_uses_valid_iana_timezone() -> None:
+    assert str(Settings(postgres_password="test-password").timezone) == "Europe/Samara"
+    with pytest.raises(ValidationError):
+        Settings(postgres_password="test-password", app_timezone="not/a-timezone")

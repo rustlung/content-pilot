@@ -39,3 +39,30 @@ def list_posts(session: Session, content_item_id: object) -> list[Post]:
     if session.get(ContentItem, content_item_id) is None:
         raise NotFoundError("Content item not found")
     return list(session.scalars(select(Post).where(Post.content_item_id == content_item_id)))
+
+
+def get_post(session: Session, post_id: object) -> Post:
+    post = session.scalar(
+        select(Post)
+        .options(joinedload(Post.content_item).joinedload(ContentItem.project), joinedload(Post.media_assets))
+        .where(Post.id == post_id)
+    )
+    if post is None:
+        raise NotFoundError("Post not found")
+    return post
+
+
+def update_draft_post_text(session: Session, post_id: object, text: str) -> Post:
+    post = get_post(session, post_id)
+    if post.status is not PostStatus.DRAFT:
+        raise ConflictError("Only a draft post can be edited")
+    if not text.strip():
+        raise ValidationDomainError("Post text must not be blank")
+    post.text = text.strip()
+    try:
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    session.refresh(post)
+    return post

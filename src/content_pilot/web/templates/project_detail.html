@@ -1,0 +1,4 @@
+{% extends "base.html" %}{% block title %}{{ project.name }} — {{ app_name }}{% endblock %}{% block content %}
+<section class="page-heading"><div><p class="eyebrow">Проект</p><h1>{{ project.name }}</h1><p class="muted">{{ project.description or 'Описание не указано.' }}</p></div><a class="button" href="/projects/{{ project.id }}/plan">Контент-план</a></section>
+<section class="grid-two"><article class="panel"><h2>Настройки</h2><dl><dt>Язык</dt><dd>{{ project.language }}</dd><dt>Аудитория</dt><dd>{{ project.audience or '—' }}</dd><dt>Тон</dt><dd>{{ project.tone_of_voice or '—' }}</dd></dl></article><article class="panel"><h2>Содержимое</h2><dl><dt>Элементы плана</dt><dd>{{ content_items|length }}</dd><dt>Посты</dt><dd>{{ content_items|map(attribute='posts')|map('length')|sum }}</dd></dl><a class="link-button" href="/projects/{{ project.id }}/plan">Открыть или сгенерировать план</a></article></section>
+{% endblock %}

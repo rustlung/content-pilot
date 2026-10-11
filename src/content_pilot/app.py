@@ -2,12 +2,12 @@
 from __future__ import annotations
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from content_pilot.api.router import router as api_router
 from content_pilot.config import Settings
-from content_pilot.web.router import router as web_router
+from content_pilot.web.router import TEMPLATES, router as web_router, template_context
 from content_pilot.ai.client import AIConfigurationError, AIError, AIProviderError, AIResponseValidationError
 from content_pilot.services.errors import ConflictError, NotFoundError, ValidationDomainError
 
@@ -18,25 +18,36 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title=resolved_settings.app_name, debug=resolved_settings.app_debug)
     app.state.settings = resolved_settings
     app.mount("/media", StaticFiles(directory=resolved_settings.media_root, check_dir=False), name="media")
+    app.mount("/static", StaticFiles(directory="src/content_pilot/web/static"), name="static")
+
+    def error_response(request: Request, status_code: int, title: str, detail: str) -> Response:
+        if request.url.path.startswith("/api"):
+            return JSONResponse(status_code=status_code, content={"detail": detail})
+        return TEMPLATES.TemplateResponse(
+            request=request,
+            name="error.html",
+            context=template_context(request, status_code=status_code, title=title, detail=detail),
+            status_code=status_code,
+        )
 
     @app.exception_handler(NotFoundError)
-    async def not_found(_: Request, error: NotFoundError) -> JSONResponse:
-        return JSONResponse(status_code=404, content={"detail": str(error)})
+    async def not_found(request: Request, error: NotFoundError) -> Response:
+        return error_response(request, 404, "Ничего не найдено", str(error))
 
     @app.exception_handler(ConflictError)
-    async def conflict(_: Request, error: ConflictError) -> JSONResponse:
-        return JSONResponse(status_code=409, content={"detail": str(error)})
+    async def conflict(request: Request, error: ConflictError) -> Response:
+        return error_response(request, 409, "Действие недоступно", str(error))
 
     @app.exception_handler(ValidationDomainError)
-    async def invalid(_: Request, error: ValidationDomainError) -> JSONResponse:
-        return JSONResponse(status_code=422, content={"detail": str(error)})
+    async def invalid(request: Request, error: ValidationDomainError) -> Response:
+        return error_response(request, 422, "Проверьте введённые данные", str(error))
 
     @app.exception_handler(AIConfigurationError)
-    async def ai_config(_: Request, error: AIConfigurationError) -> JSONResponse:
-        return JSONResponse(status_code=503, content={"detail": str(error)})
+    async def ai_config(request: Request, error: AIConfigurationError) -> Response:
+        return error_response(request, 503, "AI-генерация не настроена", str(error))
 
-    async def ai_failure(_: Request, error: AIError) -> JSONResponse:
-        return JSONResponse(status_code=502, content={"detail": str(error)})
+    async def ai_failure(request: Request, error: AIError) -> Response:
+        return error_response(request, 502, "AI-сервис недоступен", str(error))
 
     app.add_exception_handler(AIProviderError, ai_failure)
     app.add_exception_handler(AIResponseValidationError, ai_failure)

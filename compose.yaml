@@ -34,6 +34,7 @@ services:
       APP_NAME: ${APP_NAME:-ContentPilot}
       APP_ENV: ${APP_ENV:-development}
       APP_DEBUG: ${APP_DEBUG:-true}
+      APP_TIMEZONE: ${APP_TIMEZONE:-Europe/Samara}
       POSTGRES_HOST: content-pilot-db
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-content_pilot}
