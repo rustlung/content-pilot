@@ -1,0 +1,13 @@
+"""Provider protocol used by application services and deterministic test fakes."""
+from __future__ import annotations
+
+from typing import Protocol
+
+from content_pilot.ai.schemas import ContentPlanAI, ImagePromptAI, PostGenerationAI
+
+
+class AIProvider(Protocol):
+    def generate_content_plan(self, prompt: str) -> ContentPlanAI: ...
+    def generate_post(self, prompt: str) -> PostGenerationAI: ...
+    def generate_image_prompt(self, prompt: str) -> ImagePromptAI: ...
+    def generate_image(self, prompt: str) -> bytes: ...

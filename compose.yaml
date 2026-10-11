@@ -41,21 +41,29 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me}
       REDIS_HOST: content-pilot-redis
       REDIS_PORT: 6379
+      PROXYAPI_API_KEY: ${PROXYAPI_API_KEY:-}
+      PROXYAPI_BASE_URL: ${PROXYAPI_BASE_URL:-https://api.proxyapi.ru/v1}
+      AI_TEXT_MODEL: ${AI_TEXT_MODEL:-openai/gpt-4.1-mini}
+      AI_IMAGE_MODEL: ${AI_IMAGE_MODEL:-openai/gpt-image-1-mini}
+      AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-60}
+      MEDIA_ROOT: /app/data/media
     command: uvicorn content_pilot.app:create_app --factory --host 0.0.0.0 --port 8000 --reload
     depends_on:
       content-pilot-db:
         condition: service_healthy
     ports:
-      - "8001:8000"
+      - "8002:8000"
     volumes:
       - ./src:/app/src
       - ./alembic:/app/alembic
       - ./alembic.ini:/app/alembic.ini:ro
+      - content-pilot-media:/app/data/media
     networks:
       - content-pilot-network
 
 volumes:
   content-pilot-postgres-data:
+  content-pilot-media:
 
 networks:
   content-pilot-network:

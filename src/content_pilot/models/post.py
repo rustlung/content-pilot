@@ -5,11 +5,11 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Enum, ForeignKey, String, Text, UniqueConstraint, Uuid
+from sqlalchemy import DateTime, ForeignKey, String, Text, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from content_pilot.db.base import Base
-from content_pilot.models.enums import Platform, PostStatus
+from content_pilot.models.enums import Platform, PostStatus, database_enum
 from content_pilot.models.mixins import CreatedUpdatedAtMixin
 
 if TYPE_CHECKING:
@@ -27,11 +27,11 @@ class Post(CreatedUpdatedAtMixin, Base):
         ForeignKey("content_items.id", ondelete="CASCADE"), nullable=False
     )
     platform: Mapped[Platform] = mapped_column(
-        Enum(Platform, native_enum=False, create_constraint=True, name="platform"), nullable=False
+        database_enum(Platform, "platform"), nullable=False
     )
     text: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[PostStatus] = mapped_column(
-        Enum(PostStatus, native_enum=False, create_constraint=True, name="post_status"),
+        database_enum(PostStatus, "post_status"),
         default=PostStatus.DRAFT,
         nullable=False,
     )

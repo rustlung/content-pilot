@@ -4,11 +4,11 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Enum, ForeignKey, String, Uuid
+from sqlalchemy import Boolean, ForeignKey, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from content_pilot.db.base import Base
-from content_pilot.models.enums import Platform
+from content_pilot.models.enums import Platform, database_enum
 from content_pilot.models.mixins import CreatedUpdatedAtMixin
 
 if TYPE_CHECKING:
@@ -23,7 +23,7 @@ class SocialAccount(CreatedUpdatedAtMixin, Base):
         ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
     )
     platform: Mapped[Platform] = mapped_column(
-        Enum(Platform, native_enum=False, create_constraint=True, name="platform"), nullable=False
+        database_enum(Platform, "platform"), nullable=False
     )
     display_name: Mapped[str] = mapped_column(String(255), nullable=False)
     external_account_id: Mapped[str] = mapped_column(String(255), nullable=False)

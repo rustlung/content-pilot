@@ -24,7 +24,7 @@ class Project(CreatedUpdatedAtMixin, Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     audience: Mapped[str | None] = mapped_column(Text, nullable=True)
     tone_of_voice: Mapped[str | None] = mapped_column(Text, nullable=True)
-    language: Mapped[str] = mapped_column(String(16), nullable=False)
+    language: Mapped[str] = mapped_column(String(16), default="ru", nullable=False)
 
     social_accounts: Mapped[list[SocialAccount]] = relationship(
         back_populates="project", cascade="all, delete-orphan"

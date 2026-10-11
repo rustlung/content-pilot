@@ -5,11 +5,11 @@ import uuid
 from datetime import date
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Enum, ForeignKey, String, Uuid
+from sqlalchemy import ForeignKey, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from content_pilot.db.base import Base
-from content_pilot.models.enums import ContentItemStatus
+from content_pilot.models.enums import ContentItemStatus, database_enum
 from content_pilot.models.mixins import CreatedUpdatedAtMixin
 
 if TYPE_CHECKING:
@@ -30,7 +30,7 @@ class ContentItem(CreatedUpdatedAtMixin, Base):
     content_type: Mapped[str] = mapped_column(String(64), nullable=False)
     planned_date: Mapped[date | None] = mapped_column(nullable=True)
     status: Mapped[ContentItemStatus] = mapped_column(
-        Enum(ContentItemStatus, native_enum=False, create_constraint=True, name="content_item_status"),
+        database_enum(ContentItemStatus, "content_item_status"),
         default=ContentItemStatus.DRAFT,
         nullable=False,
     )

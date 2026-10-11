@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from functools import cached_property
+from pathlib import Path
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -26,6 +27,13 @@ class Settings(BaseSettings):
 
     redis_host: str = "content-pilot-redis"
     redis_port: int = Field(default=6379, ge=1, le=65535)
+
+    proxyapi_api_key: SecretStr | None = None
+    proxyapi_base_url: str = "https://api.proxyapi.ru/v1"
+    ai_text_model: str = "openai/gpt-4.1-mini"
+    ai_image_model: str = "openai/gpt-image-1-mini"
+    ai_timeout_seconds: int = Field(default=60, ge=1, le=300)
+    media_root: Path = Path("data/media")
 
     @cached_property
     def sqlalchemy_database_url(self) -> str:

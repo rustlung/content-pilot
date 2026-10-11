@@ -5,11 +5,11 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, Integer, String, Text, UniqueConstraint, Uuid
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from content_pilot.db.base import Base
-from content_pilot.models.enums import PublicationAttemptStatus
+from content_pilot.models.enums import PublicationAttemptStatus, database_enum
 from content_pilot.models.mixins import CreatedAtMixin, utc_now
 
 if TYPE_CHECKING:
@@ -29,12 +29,7 @@ class PublicationAttempt(CreatedAtMixin, Base):
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[PublicationAttemptStatus] = mapped_column(
-        Enum(
-            PublicationAttemptStatus,
-            native_enum=False,
-            create_constraint=True,
-            name="publication_attempt_status",
-        ),
+        database_enum(PublicationAttemptStatus, "publication_attempt_status"),
         default=PublicationAttemptStatus.STARTED,
         nullable=False,
     )
