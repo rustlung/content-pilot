@@ -1,22 +1,23 @@
 # ContentPilot
 
-ContentPilot 0.1.0 is a single-user MVP for AI-assisted content planning,
-platform-specific drafting, image generation, scheduling, and social publishing.
-The server-rendered interface is Russian-first and is designed for a practical
-developer personal-brand workflow.
+ContentPilot 0.1.0 — однопользовательский MVP для AI-ассистированного
+контент-планирования, подготовки версий постов для разных платформ, генерации
+изображений, планирования публикаций и публикации в соцсетях. Серверный
+интерфейс ориентирован прежде всего на русский язык и практический процесс
+личного бренда разработчика.
 
-## Features
+## Возможности
 
-- Structured AI content plans and platform-specific posts through ProxyAPI
-- AI image generation stored under `MEDIA_ROOT`
-- Draft, approval, scheduling, cancellation, and publication workflow
-- PostgreSQL-backed scheduling with Celery Beat, Redis, and a low-concurrency worker
-- Telegram automatic text and image publication
-- VK community automatic text publication
-- LinkedIn manual copy/download workflow
-- Internal publication analytics and attempt history
+- Структурированные AI-контент-планы и посты для платформ через ProxyAPI
+- Генерация AI-изображений с хранением в `MEDIA_ROOT`
+- Процесс: черновик, подтверждение, планирование, отмена и публикация
+- Планирование на базе PostgreSQL с Celery Beat, Redis и worker с ограниченной concurrency
+- Автоматическая публикация текста и изображений в Telegram
+- Автоматическая публикация текста в VK-сообществе
+- Ручной процесс копирования и скачивания для LinkedIn
+- Внутренняя аналитика публикаций и история попыток
 
-## Architecture
+## Архитектура
 
 ```text
 Browser
@@ -38,28 +39,28 @@ Telegram / VK
 PostgreSQL
 ```
 
-PostgreSQL is the source of truth for schedules, post state, and publication
-attempts. Redis is Celery's broker only.
+PostgreSQL — источник истины для расписания, состояния постов и попыток
+публикации. Redis используется только как брокер Celery.
 
-## Tech stack
+## Технологический стек
 
 - Python 3.12, FastAPI, Uvicorn, Jinja2, vanilla CSS/JavaScript
 - PostgreSQL, SQLAlchemy 2, Alembic, psycopg
 - Pydantic Settings, httpx, OpenAI SDK, ProxyAPI
 - Redis, Celery Worker, Celery Beat
-- pytest and Docker Compose
+- pytest и Docker Compose
 
-## Platform capabilities
+## Возможности платформ
 
-| Platform | Text generation | Image generation | Auto text publish | Auto image publish |
+| Платформа | Генерация текста | Генерация изображения | Автопубликация текста | Автопубликация изображения |
 |---|---:|---:|---:|---:|
-| LinkedIn | yes | yes | no, manual | no, manual |
-| VK | yes | yes | yes | no, manual fallback |
-| Telegram | yes | yes | yes | yes |
+| LinkedIn | да | да | нет, вручную | нет, вручную |
+| VK | да | да | да | нет, вручную |
+| Telegram | да | да | да | да |
 
-## Local setup
+## Локальный запуск
 
-Use Python 3.12 and Docker Desktop.
+Используйте Python 3.12 и Docker Desktop.
 
 ```powershell
 Copy-Item .env.example .env
@@ -69,14 +70,15 @@ docker compose up -d --build
 docker compose exec content-pilot-api alembic upgrade head
 ```
 
-Open `http://localhost:8002/`. Main routes are `/`, `/projects`, `/health`, and
-`/api/health`.
+Откройте `http://localhost:8002/`. Основные маршруты: `/`, `/projects`,
+`/health` и `/api/health`.
 
-## Environment variables
+## Переменные окружения
 
-Set a strong `POSTGRES_PASSWORD`; `.env` is Git-ignored. `PROXYAPI_API_KEY` is
-required only for AI generation. Social credentials are deliberately environment
-based for this single-user MVP and are supplied only to the worker container.
+Укажите надёжный `POSTGRES_PASSWORD`; `.env` игнорируется Git. `PROXYAPI_API_KEY`
+нужен только для AI-генерации. Учётные данные соцсетей намеренно хранятся в
+переменных окружения для этого однопользовательского MVP и передаются только в
+контейнер worker.
 
 ```dotenv
 # Publishing
@@ -93,11 +95,11 @@ VK_GROUP_ID=
 VK_API_VERSION=5.199
 ```
 
-For safe scheduler tests, use `APP_ENV=development` and
-`PUBLISHING_DRY_RUN=true`. This selects `DryRunPublisher` and sends no HTTP
-requests.
+Для безопасной проверки scheduler используйте `APP_ENV=development` и
+`PUBLISHING_DRY_RUN=true`. Будет выбран `DryRunPublisher`, который не выполняет
+HTTP-запросов.
 
-## Database migrations
+## Миграции базы данных
 
 ```powershell
 docker compose exec content-pilot-api alembic current
@@ -105,62 +107,70 @@ docker compose exec content-pilot-api alembic upgrade head
 docker compose exec content-pilot-api alembic check
 ```
 
-Tables are managed only by Alembic; application startup does not call
+Таблицами управляет только Alembic; при старте приложения не вызывается
 `Base.metadata.create_all()`.
 
-## Celery and scheduling
+## Celery и планирование публикаций
 
-Beat periodically queues UUIDs for due scheduled posts. The worker atomically
-claims a row as `publishing`, creates `PublicationAttempt`, invokes a publisher
-outside the database transaction, then persists `published` or `failed`.
-Default worker concurrency is `1`.
+Celery Beat периодически ставит UUID наступивших запланированных постов в
+очередь. Worker атомарно переводит запись в `publishing`, создаёт
+`PublicationAttempt`, вызывает адаптер публикации вне транзакции базы данных,
+после чего сохраняет `published` или `failed`. Значение worker concurrency по
+умолчанию — `1`.
 
 ```powershell
 docker compose logs -f content-pilot-beat
 docker compose logs -f content-pilot-worker
 ```
 
-## Social integration setup
+## Настройка социальных интеграций
 
-Telegram uses the official Bot API. For image posts within Telegram's caption
-limit, text is sent as a caption. Longer posts are sent as an image message and
-a separate full-text message, without truncation.
+Telegram использует официальный Bot API. Для постов с изображением, если текст
+укладывается в лимит caption Telegram, он отправляется в caption. Более длинные
+посты отправляются отдельным сообщением с изображением и отдельным полным
+текстом без обрезания.
 
-VK uses the official community `wall.post` method. If a post has generated
-media, ContentPilot still publishes text and leaves the image available for
-manual publishing. It intentionally does not call
+VK использует официальный метод сообщества `wall.post`. Если у поста есть
+сгенерированное медиа, ContentPilot всё равно публикует текст и оставляет
+изображение доступным для ручной публикации. Приложение намеренно не вызывает
 [`photos.getWallUploadServer`](https://dev.vk.ru/ru/method/photos.getWallUploadServer):
-the required user `photos` permission is restricted for new applications and
-would need a future request to `devsupport@corp.vk.com`.
+требуемое пользовательское разрешение `photos` ограничено для новых приложений
+и в будущем потребует обращения в `devsupport@corp.vk.com`.
 
-## Known limitations
+## Известные ограничения
 
-- LinkedIn official API access is blocked by Page/account verification; it is manual-only.
-- VK automatic image upload is intentionally unavailable for the permission reason above.
-- Telegram API networking from Russian networks may require proxy/VPN routing. A future
-  `TELEGRAM_PROXY_URL` could be isolated inside TelegramPublisher; it is not active now.
-- Publication is at-least-once at the external boundary: a provider success followed by
-  worker/database failure can result in a duplicate during retry.
-- There is no auth, multi-user credential storage, social engagement analytics, or CI/CD.
+- Доступ к официальному API LinkedIn заблокирован проверкой Page/аккаунта;
+  доступна только ручная публикация.
+- Автоматическая загрузка изображений в VK намеренно недоступна по указанной
+  выше причине, связанной с разрешениями.
+- Для доступа к Telegram API из российских сетей может потребоваться proxy/VPN.
+  Будущий `TELEGRAM_PROXY_URL` можно изолировать внутри TelegramPublisher; сейчас
+  он не используется.
+- На внешней границе публикация имеет семантику at-least-once: успешный ответ
+  провайдера перед сбоем worker/базы данных может привести к дублированию при retry.
+- Нет auth, хранения credentials для нескольких пользователей, аналитики вовлечённости
+  в соцсетях и CI/CD.
 
-## Demo and release preparation
+## Демо и подготовка к релизу
 
-Use the project **«Личный бренд Python-разработчика»** with Russian language,
-professional practical tone, and a Python-backend/AI-automation audience.
-Detailed screenshot, screencast, and Zerocoder-delivery steps are in
-[`docs/release-checklist.md`](docs/release-checklist.md). The future DOCX source
-outline is [`docs/spec-outline.md`](docs/spec-outline.md).
+Используйте проект **«Личный бренд Python-разработчика»** с русским языком,
+профессиональным практичным тоном и аудиторией, связанной с Python backend и
+AI-автоматизацией. Подробный план создания скриншотов, скринкаста и сдачи
+Zerocoder находится в [`docs/release-checklist.md`](docs/release-checklist.md).
+Исходный план для будущего DOCX —
+[`docs/spec-outline.md`](docs/spec-outline.md).
 
-## Screenshots
+## Скриншоты
 
-- Dashboard
-- Content plan
-- Post editor and image
-- Scheduling
-- Publication history
+- Дашборд
+- Контент-план
+- Редактор поста и изображение
+- Планирование публикации
+- История публикации
 
-## M0 spikes
+## M0-спайки
 
-[`scripts/spikes/README.md`](scripts/spikes/README.md) contains independent,
-manual external-integration diagnostics. They are never run by pytest or normal
-application startup; Telegram and VK spike commands can create real posts.
+[`scripts/spikes/README.md`](scripts/spikes/README.md) содержит независимые
+ручные диагностические скрипты внешних интеграций. Они никогда не запускаются
+через pytest или при обычном старте приложения; команды спайков Telegram и VK
+могут создать реальные публикации.
