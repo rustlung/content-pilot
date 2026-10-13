@@ -25,3 +25,9 @@ def test_settings_uses_valid_iana_timezone() -> None:
 def test_settings_builds_default_celery_broker_url() -> None:
     settings = Settings(postgres_password="test-password")
     assert settings.resolved_celery_broker_url == "redis://content-pilot-redis:6379/0"
+
+
+def test_settings_treats_blank_social_credentials_as_missing() -> None:
+    settings = Settings(postgres_password="test-password", telegram_bot_token="", vk_access_token="")
+    assert settings.telegram_bot_token is None
+    assert settings.vk_access_token is None

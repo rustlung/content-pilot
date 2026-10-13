@@ -1,6 +1,6 @@
 # ContentPilot
 
-ContentPilot is a modular monolith for AI-assisted content planning and future social publishing. M4 adds Redis-backed Celery scheduling and a safe DryRunPublisher pipeline; real social-network publishers remain out of scope.
+ContentPilot is a modular monolith for AI-assisted content planning and social publishing. M5 adds official Telegram and VK publication adapters to the existing Celery pipeline.
 
 ## Stack
 
@@ -17,6 +17,7 @@ src/content_pilot/  FastAPI, settings, database primitives, ORM models, routes
   ai/               structured provider schemas, prompts, ProxyAPI client
   services/         plan, draft-post, media, project, dashboard, workflow, and publication persistence
   tasks/            Celery app, due-post dispatcher, and publication task
+  publishers/       Telegram, VK, media-path validation, and publisher registry
   web/              server-rendered M3 pages, CSS, and small UX scripts
 alembic/            schema migrations
 tests/              database-free unit and metadata tests
@@ -63,7 +64,7 @@ scheduled -> cancelled
 
 LinkedIn is explicitly manual: the post page provides copy-text and image-preview actions, not a publish button. VK and Telegram pages likewise show no direct publish buttons.
 
-## M4 scheduling
+## Scheduling and publishing
 
 PostgreSQL remains the source of truth for `scheduled_at`, status, and publication attempts. Beat periodically places only due post identifiers on Redis; a worker atomically claims a row before it invokes a publisher. This avoids relying on Celery ETA messages for schedules and lets Beat rediscover overdue posts after a restart.
 
@@ -75,7 +76,7 @@ Celery Beat -> Redis -> Celery Worker -> Publisher -> PostgreSQL
 
 The worker runs with `CELERY_WORKER_CONCURRENCY=1` by default. `CELERY_DISPATCH_INTERVAL_SECONDS`, `PUBLICATION_MAX_RETRIES`, and `PUBLICATION_RETRY_BASE_SECONDS` are configured in `.env`. Retryable provider failures use exponential backoff; task results are not stored in Redis because lifecycle state is persisted in PostgreSQL.
 
-No real publisher exists in M4. For the deliberate local acceptance scenario only, set `APP_ENV=development` and `PUBLISHING_DRY_RUN=true`; `DryRunPublisher` then returns a `dry-run:<uuid>` external ID without making HTTP requests. With dry-run disabled, a scheduled VK/Telegram post safely becomes `failed` with a publisher-unavailable error. M5 will provide real adapters.
+For a safe local acceptance scenario, set `APP_ENV=development` and `PUBLISHING_DRY_RUN=true`; `DryRunPublisher` then returns a `dry-run:<uuid>` external ID without making HTTP requests. In M5, setting it to `false` selects a real Telegram or VK adapter. LinkedIn remains manual-only.
 
 ```powershell
 docker compose up -d --build
@@ -83,6 +84,34 @@ docker compose exec content-pilot-api alembic upgrade head
 docker compose logs -f content-pilot-beat
 docker compose logs -f content-pilot-worker
 ```
+
+## M5 platform capabilities
+
+| Platform | Generate text | Generate image | Auto text publish | Auto image publish |
+|---|---:|---:|---:|---:|
+| LinkedIn | yes | yes | no, manual | no, manual |
+| VK | yes | yes | yes | no, manual fallback |
+| Telegram | yes | yes | yes | yes |
+
+Telegram uses the official Bot API. A short image post is sent with a caption; when the post exceeds Telegram's caption limit, ContentPilot sends the image and then the full text as a second message without truncating it. The persisted external ID identifies one message or, for the two-message flow, both message IDs.
+
+VK uses the official `wall.post` community method with the configured community token. If a VK post has generated media, ContentPilot still publishes its text and keeps the image available in the UI for manual publication. It deliberately does not call `photos.getWallUploadServer`: that flow requires a user token with `photos` permission, which is restricted for new VK apps. See [VK photos.getWallUploadServer](https://dev.vk.ru/ru/method/photos.getWallUploadServer); obtaining that permission is a future support request to `devsupport@corp.vk.com`.
+
+Configure only the worker with the relevant credentials in `.env`; Beat does not receive social tokens.
+
+```dotenv
+PUBLISHING_DRY_RUN=false
+SOCIAL_HTTP_TIMEOUT_SECONDS=30
+
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=
+
+VK_ACCESS_TOKEN=
+VK_GROUP_ID=
+VK_API_VERSION=5.199
+```
+
+The M4 atomic claim protects against duplicate queued tasks, but publication is not exactly-once: if a provider accepts a post and the worker dies before PostgreSQL records success, a later retry can create a duplicate provider post. M5 intentionally does not claim a provider idempotency guarantee that has not been implemented.
 
 ## M2 AI configuration and JSON API
 

@@ -22,7 +22,7 @@ def test_web_workflow_and_manual_linkedin_mode(client: TestClient) -> None:
     project_id = project_url.rsplit("/", 1)[-1]
     plan = client.post(
         f"/projects/{project_id}/plan/generate",
-        data={"start_date": date.today().isoformat(), "end_date": (date.today() + timedelta(days=2)).isoformat(), "posts_count": "1", "platforms": "linkedin"},
+        data={"start_date": "2026-10-10", "end_date": "2026-10-12", "posts_count": "1", "platforms": "linkedin"},
         follow_redirects=False,
     )
     assert plan.status_code == 303
@@ -48,6 +48,7 @@ def test_web_workflow_and_manual_linkedin_mode(client: TestClient) -> None:
     )
     vk_post_url = generated_vk.headers["location"].split("?")[0]
     vk_post_id = vk_post_url.rsplit("/", 1)[-1]
+    assert "Изображения публикуйте вручную" in client.get(vk_post_url).text
     assert client.post(f"/posts/{vk_post_id}/approve", follow_redirects=False).status_code == 303
     assert client.post(f"/posts/{vk_post_id}/schedule", data={"scheduled_at": future}, follow_redirects=False).status_code == 303
     dashboard = client.get("/")

@@ -145,11 +145,11 @@ def test_task_publishes_once_and_duplicate_task_skips(monkeypatch) -> None:
         post_id = str(post.id)
 
     class FakePublisher:
-        def publish(self, post: Post) -> publishing.PublicationResult:
+        def publish(self, post: Post, media) -> publishing.PublicationResult:
             return publishing.PublicationResult("fake:123")
 
     monkeypatch.setattr(publishing, "get_session_factory", lambda: factory)
-    monkeypatch.setattr(publishing, "resolve_publisher", lambda settings, platform: FakePublisher())
+    monkeypatch.setattr(publishing, "resolve_publisher", lambda platform, settings: FakePublisher())
 
     publishing.publish_post.apply(args=[post_id], task_id="task-a").get()
     publishing.publish_post.apply(args=[post_id], task_id="task-b").get()

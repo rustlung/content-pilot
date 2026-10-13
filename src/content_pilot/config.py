@@ -36,6 +36,13 @@ class Settings(BaseSettings):
     publication_max_retries: int = Field(default=3, ge=0)
     publication_retry_base_seconds: int = Field(default=30, ge=1)
     publishing_dry_run: bool = False
+    social_http_timeout_seconds: int = Field(default=30, ge=1, le=300)
+
+    telegram_bot_token: SecretStr | None = None
+    telegram_chat_id: str | None = None
+    vk_access_token: SecretStr | None = None
+    vk_group_id: str | None = None
+    vk_api_version: str = "5.199"
 
     proxyapi_api_key: SecretStr | None = None
     proxyapi_base_url: str = "https://api.proxyapi.ru/v1"
@@ -52,6 +59,21 @@ class Settings(BaseSettings):
         except ZoneInfoNotFoundError as error:
             raise ValueError("APP_TIMEZONE must be a valid IANA timezone") from error
         return value
+
+    @field_validator("vk_api_version", mode="before")
+    @classmethod
+    def default_vk_api_version(cls, value: str | None) -> str:
+        return value or "5.199"
+
+    @field_validator("telegram_bot_token", "vk_access_token", mode="before")
+    @classmethod
+    def empty_secret_is_missing(cls, value: str | None) -> str | None:
+        return value.strip() or None if isinstance(value, str) else value
+
+    @field_validator("telegram_chat_id", "vk_group_id", mode="before")
+    @classmethod
+    def empty_identifier_is_missing(cls, value: str | None) -> str | None:
+        return value.strip() or None if isinstance(value, str) else value
 
     @cached_property
     def timezone(self) -> ZoneInfo:

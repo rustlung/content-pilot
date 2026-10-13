@@ -13,9 +13,9 @@
 <section class="grid-two">
   <article class="panel">
     <h2>Текст поста</h2>
-    {% if post.platform.value == 'linkedin' %}<p class="notice">LinkedIn: ручная публикация. Автоматическая публикация пока недоступна.</p>
-    {% elif post.platform.value == 'vk' %}<p class="notice">Автопубликация VK будет подключена на следующем этапе.</p>
-    {% else %}<p class="notice">Автопубликация Telegram будет подключена на следующем этапе.</p>{% endif %}
+    {% if post.platform.value == 'linkedin' %}<p class="notice">LinkedIn: ручная публикация.</p>
+    {% elif post.platform.value == 'vk' %}<p class="notice">VK: автопубликация текста. Изображения публикуйте вручную: VK API требует недоступное приложению permission photos.</p>
+    {% else %}<p class="notice">Telegram: автопубликация текста и изображений.</p>{% endif %}
     <div class="post-text" id="post-text">{{ post.text or 'Текст ещё не сгенерирован.' }}</div>
     {% if post.platform.value == 'linkedin' and post.text %}<button class="button button-secondary" type="button" data-copy-target="post-text">Копировать текст</button>{% endif %}
   </article>
