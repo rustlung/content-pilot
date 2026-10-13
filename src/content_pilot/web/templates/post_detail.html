@@ -14,7 +14,14 @@
   <article class="panel">
     <h2>Текст поста</h2>
     {% if post.platform.value == 'linkedin' %}<p class="notice">LinkedIn: ручная публикация.</p>
-    {% elif post.platform.value == 'vk' %}<p class="notice">VK: автопубликация текста. Изображения публикуйте вручную: VK API требует недоступное приложению permission photos.</p>
+    {% elif post.platform.value == 'vk' %}
+    <p class="notice">
+      {% if post.status.value == 'published' and post.media_assets %}
+      Текст опубликован в VK. Изображение не было отправлено автоматически: VK API требует недоступное приложению permission <code>photos</code>. Оно доступно ниже для ручной публикации.
+      {% else %}
+      VK: автопубликация текста. Изображения публикуйте вручную: VK API требует недоступное приложению permission <code>photos</code>.
+      {% endif %}
+    </p>
     {% else %}<p class="notice">Telegram: автопубликация текста и изображений.</p>{% endif %}
     <div class="post-text" id="post-text">{{ post.text or 'Текст ещё не сгенерирован.' }}</div>
     {% if post.platform.value == 'linkedin' and post.text %}<button class="button button-secondary" type="button" data-copy-target="post-text">Копировать текст</button>{% endif %}
@@ -43,6 +50,7 @@
     {% endif %}
   </article>
 </section>
+<section class="panel"><h2>История публикации</h2>{% if post.publication_attempts %}<div class="table-wrap"><table><thead><tr><th>№</th><th>Начало</th><th>Завершение</th><th>Статус</th><th>Внешний ID</th><th>Ошибка</th></tr></thead><tbody>{% for attempt in post.publication_attempts %}<tr><td>{{ attempt.attempt_no }}</td><td>{{ attempt.started_at|local_datetime(app_timezone) }}</td><td>{{ attempt.finished_at|local_datetime(app_timezone) }}</td><td><span class="badge badge-{{ attempt.status.value }}">{{ attempt_status_labels[attempt.status] }}</span></td><td>{{ attempt.external_response_id or '—' }}</td><td>{{ attempt.error or '—' }}{% if attempt.celery_task_id %}<details><summary>Технические детали</summary><code>{{ attempt.celery_task_id }}</code></details>{% endif %}</td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="muted">Попыток публикации пока нет.</p>{% endif %}</section>
 <section class="panel">
   <h2>Редактор</h2>
   {% if post.status.value == 'draft' %}

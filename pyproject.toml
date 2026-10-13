@@ -1,6 +1,6 @@
 [project]
 name = "content-pilot"
-version = "0.0.0"
+version = "0.1.0"
 description = "Content planning and social publishing foundation"
 requires-python = ">=3.12"
 dependencies = [

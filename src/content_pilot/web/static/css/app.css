@@ -559,6 +559,49 @@ dd {
   flex: 0 0 auto;
 }
 
+.analytics-grid .panel {
+  min-height: 0;
+}
+
+.metric-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px 20px;
+  margin: 0;
+}
+
+.metric-list dt,
+.metric-list dd {
+  margin: 0;
+}
+
+.metric-list dd {
+  color: var(--brand);
+  font-weight: 750;
+  text-align: right;
+}
+
+.compact-list small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+}
+
+.capability-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.capability-grid span {
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: #f1f4f8;
+  color: var(--ink);
+  font-size: 14px;
+}
+
 .projects-table {
   table-layout: fixed;
 }

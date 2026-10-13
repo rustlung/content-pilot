@@ -35,6 +35,7 @@ def test_web_workflow_and_manual_linkedin_mode(client: TestClient) -> None:
     detail = client.get(post_url)
     assert detail.status_code == 200
     assert "LinkedIn:" in detail.text
+    assert "Попыток публикации пока нет" in detail.text
     edited = client.post(f"/posts/{post_id}/edit", data={"text": "Отредактированный текст."}, follow_redirects=False)
     assert edited.status_code == 303
     image = client.post(f"/posts/{post_id}/image/generate", follow_redirects=False)

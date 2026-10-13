@@ -16,9 +16,9 @@ from content_pilot.ai.service import AIProvider
 from content_pilot.api.dependencies import get_ai_provider
 from content_pilot.config import Settings
 from content_pilot.db.session import get_session
-from content_pilot.models.enums import ContentItemStatus, Platform, PostStatus
+from content_pilot.models.enums import ContentItemStatus, Platform, PostStatus, PublicationAttemptStatus
 from content_pilot.services.content_plans import generate_content_plan, list_content_items
-from content_pilot.services.dashboard import dashboard_data
+from content_pilot.services.dashboard import dashboard_data, project_analytics
 from content_pilot.services.errors import ValidationDomainError
 from content_pilot.services.media import generate_image
 from content_pilot.services.post_workflow import approve_post, cancel_post, schedule_post, unschedule_post
@@ -38,6 +38,11 @@ CONTENT_ITEM_STATUS_LABELS = {
     ContentItemStatus.DRAFT: "Черновик", ContentItemStatus.PLANNED: "Запланирован", ContentItemStatus.CANCELLED: "Отменён",
 }
 PLATFORM_LABELS = {Platform.LINKEDIN: "LinkedIn", Platform.VK: "VK", Platform.TELEGRAM: "Telegram"}
+PUBLICATION_ATTEMPT_STATUS_LABELS = {
+    PublicationAttemptStatus.STARTED: "Выполняется",
+    PublicationAttemptStatus.SUCCESS: "Успешно",
+    PublicationAttemptStatus.FAILED: "Ошибка",
+}
 
 
 def _local_datetime(value: datetime | None, timezone_name: str) -> str:
@@ -55,7 +60,7 @@ def template_context(request: Request, **context: object) -> dict[str, object]:
         "app_name": settings.app_name, "app_env": settings.app_env, "app_timezone": settings.app_timezone,
         "message": request.query_params.get("message"), "message_type": request.query_params.get("message_type", "success"),
         "post_status_labels": POST_STATUS_LABELS, "content_item_status_labels": CONTENT_ITEM_STATUS_LABELS,
-        "platform_labels": PLATFORM_LABELS, **context,
+        "platform_labels": PLATFORM_LABELS, "attempt_status_labels": PUBLICATION_ATTEMPT_STATUS_LABELS, **context,
     }
 
 
@@ -111,7 +116,13 @@ def project_create(
 @router.get("/projects/{project_id}", response_class=HTMLResponse)
 def project_detail(request: Request, project_id: UUID, session: Session = Depends(get_session)) -> HTMLResponse:
     project = get_project(session, project_id)
-    return render(request, "project_detail.html", project=project, content_items=list_content_items(session, project_id))
+    return render(
+        request,
+        "project_detail.html",
+        project=project,
+        content_items=list_content_items(session, project_id),
+        analytics=project_analytics(session, project_id),
+    )
 
 
 @router.get("/projects/{project_id}/plan", response_class=HTMLResponse)

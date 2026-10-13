@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from content_pilot.ai.prompts import post_prompt
 from content_pilot.ai.service import AIProvider
@@ -44,11 +44,16 @@ def list_posts(session: Session, content_item_id: object) -> list[Post]:
 def get_post(session: Session, post_id: object) -> Post:
     post = session.scalar(
         select(Post)
-        .options(joinedload(Post.content_item).joinedload(ContentItem.project), joinedload(Post.media_assets))
+        .options(
+            joinedload(Post.content_item).joinedload(ContentItem.project),
+            joinedload(Post.media_assets),
+            selectinload(Post.publication_attempts),
+        )
         .where(Post.id == post_id)
     )
     if post is None:
         raise NotFoundError("Post not found")
+    post.publication_attempts.sort(key=lambda attempt: attempt.attempt_no, reverse=True)
     return post
 
 
