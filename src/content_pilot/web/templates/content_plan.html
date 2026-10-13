@@ -1,5 +1,99 @@
-{% extends "base.html" %}{% block title %}Контент-план — {{ project.name }}{% endblock %}{% block content %}
-<section class="page-heading"><div><p class="eyebrow"><a href="/projects/{{ project.id }}">{{ project.name }}</a></p><h1>Контент-план</h1><p class="muted">Генерация выполняется синхронно и может занять несколько секунд.</p></div></section>
-<section class="panel"><h2>Сгенерировать план</h2><form method="post" action="/projects/{{ project.id }}/plan/generate" class="form-grid" data-ai-form><label>Начало периода<input type="date" name="start_date" value="{{ today }}" required></label><label>Конец периода<input type="date" name="end_date" required></label><label>Количество постов<input type="number" name="posts_count" min="1" max="100" value="3" required></label><fieldset class="full"><legend>Платформы</legend>{% for platform in platforms %}<label class="check"><input type="checkbox" name="platforms" value="{{ platform.value }}" checked> {{ platform_labels[platform] }}</label>{% endfor %}</fieldset><div class="full actions"><button class="button" type="submit" data-loading-text="Генерация плана…">Сгенерировать план</button></div></form></section>
-<section class="panel"><div class="panel-heading"><h2>Элементы плана</h2><span>{{ content_items|length }}</span></div>{% if content_items %}<div class="table-wrap"><table><thead><tr><th>Дата</th><th>Тема</th><th>Цель</th><th>Тип</th><th>Статус</th><th>Посты</th><th>Действие</th></tr></thead><tbody>{% for item in content_items %}<tr><td>{{ item.planned_date or '—' }}</td><td><strong>{{ item.title }}</strong>{% if item.topic %}<small>{{ item.topic }}</small>{% endif %}</td><td>{{ item.goal or '—' }}</td><td>{{ item.content_type }}</td><td><span class="badge badge-{{ item.status.value }}">{{ content_item_status_labels[item.status] }}</span></td><td><div class="post-badges">{% for platform in platforms %}{% set found = item.posts|selectattr('platform', 'equalto', platform)|list %}<span>{{ platform_labels[platform] }}: {% if found %}<a href="/posts/{{ found[0].id }}">{{ post_status_labels[found[0].status] }}</a>{% else %}—{% endif %}</span>{% endfor %}</div></td><td><details><summary>Создать пост</summary><form method="post" action="/content-items/{{ item.id }}/posts/generate" data-ai-form><select name="platform">{% for platform in platforms %}<option value="{{ platform.value }}">{{ platform_labels[platform] }}</option>{% endfor %}</select><input name="instructions" placeholder="Дополнительные инструкции"><button class="link-button" data-loading-text="Генерация…">Сгенерировать</button></form></details></td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="muted">План пока пуст.</p>{% endif %}</section>
+{% extends "base.html" %}
+{% block title %}Контент-план — {{ project.name }}{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div>
+    <p class="eyebrow"><a href="/projects/{{ project.id }}">{{ project.name }}</a></p>
+    <h1>Контент-план</h1>
+    <p class="muted">Генерация выполняется синхронно и может занять несколько секунд.</p>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Сгенерировать план</h2>
+  <form method="post" action="/projects/{{ project.id }}/plan/generate" class="form-grid content-plan-form" data-ai-form>
+    <label>Начало периода<input type="date" name="start_date" value="{{ today }}" required></label>
+    <label>Конец периода<input type="date" name="end_date" required></label>
+    <label>Количество постов<input type="number" name="posts_count" min="1" max="100" value="3" required></label>
+    <fieldset class="full">
+      <legend>Платформы</legend>
+      {% for platform in platforms %}
+      <label class="check"><input type="checkbox" name="platforms" value="{{ platform.value }}" checked> {{ platform_labels[platform] }}</label>
+      {% endfor %}
+    </fieldset>
+    <div class="full actions"><button class="button" type="submit" data-loading-text="Генерация плана…">Сгенерировать план</button></div>
+  </form>
+</section>
+
+<section class="panel">
+  <div class="panel-heading"><h2>Элементы плана</h2><span>{{ content_items|length }}</span></div>
+  {% if content_items %}
+  <div class="table-wrap content-plan-table">
+    <table>
+      <thead><tr><th>Дата</th><th>Тема</th><th>Цель</th><th>Тип</th><th>Статус</th><th>Посты</th><th>Действие</th></tr></thead>
+      <tbody>
+        {% for item in content_items %}
+        <tr>
+          <td>{{ item.planned_date or '—' }}</td>
+          <td><strong>{{ item.title }}</strong>{% if item.topic %}<small>{{ item.topic }}</small>{% endif %}</td>
+          <td>{{ item.goal or '—' }}</td>
+          <td>{{ item.content_type }}</td>
+          <td><span class="badge badge-{{ item.status.value }}">{{ content_item_status_labels[item.status] }}</span></td>
+          <td>
+            <div class="post-badges">
+              {% for platform in platforms %}
+              {% set found = item.posts|selectattr('platform', 'equalto', platform)|list %}
+              <span>{{ platform_labels[platform] }}: {% if found %}<a href="/posts/{{ found[0].id }}">{{ post_status_labels[found[0].status] }}</a>{% else %}—{% endif %}</span>
+              {% endfor %}
+            </div>
+          </td>
+          <td>
+            <details>
+              <summary>Создать пост</summary>
+              <form method="post" action="/content-items/{{ item.id }}/posts/generate" data-ai-form>
+                <select name="platform">{% for platform in platforms %}<option value="{{ platform.value }}">{{ platform_labels[platform] }}</option>{% endfor %}</select>
+                <input name="instructions" placeholder="Дополнительные инструкции">
+                <button class="link-button" data-loading-text="Генерация…">Сгенерировать</button>
+              </form>
+            </details>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="content-plan-cards">
+    {% for item in content_items %}
+    <article class="content-plan-card">
+      <time class="content-plan-date">{{ item.planned_date or 'Дата не назначена' }}</time>
+      <h3>{{ item.title }}</h3>
+      {% if item.topic %}<p class="content-plan-topic">{{ item.topic }}</p>{% endif %}
+      <dl class="content-plan-meta">
+        <div><dt>Цель</dt><dd>{{ item.goal or '—' }}</dd></div>
+        <div><dt>Тип</dt><dd>{{ item.content_type }}</dd></div>
+        <div><dt>Статус</dt><dd><span class="badge badge-{{ item.status.value }}">{{ content_item_status_labels[item.status] }}</span></dd></div>
+      </dl>
+      <div class="content-plan-platforms">
+        <h4>Посты по платформам</h4>
+        {% for platform in platforms %}
+        {% set found = item.posts|selectattr('platform', 'equalto', platform)|list %}
+        <p><span>{{ platform_labels[platform] }}</span>{% if found %}<a href="/posts/{{ found[0].id }}">{{ post_status_labels[found[0].status] }}</a>{% else %}<span>—</span>{% endif %}</p>
+        {% endfor %}
+      </div>
+      <details class="content-plan-action">
+        <summary>Создать пост</summary>
+        <form method="post" action="/content-items/{{ item.id }}/posts/generate" data-ai-form>
+          <label>Платформа<select name="platform">{% for platform in platforms %}<option value="{{ platform.value }}">{{ platform_labels[platform] }}</option>{% endfor %}</select></label>
+          <label>Дополнительные инструкции<input name="instructions"></label>
+          <button class="button" type="submit" data-loading-text="Генерация…">Сгенерировать</button>
+        </form>
+      </details>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="muted">План пока пуст.</p>
+  {% endif %}
+</section>
 {% endblock %}

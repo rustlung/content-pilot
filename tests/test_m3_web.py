@@ -26,6 +26,12 @@ def test_web_workflow_and_manual_linkedin_mode(client: TestClient) -> None:
         follow_redirects=False,
     )
     assert plan.status_code == 303
+    plan_page = client.get(f"/projects/{project_id}/plan")
+    assert plan_page.status_code == 200
+    assert 'class="table-wrap content-plan-table"' in plan_page.text
+    assert 'class="content-plan-cards"' in plan_page.text
+    assert f'/content-items/' in plan_page.text
+    assert "Создать пост" in plan_page.text
     item_id = client.get(f"/api/projects/{project_id}/content-items").json()[0]["id"]
     generated = client.post(
         f"/content-items/{item_id}/posts/generate", data={"platform": "linkedin"}, follow_redirects=False

@@ -371,6 +371,99 @@ td small {
   color: #244ca0;
 }
 
+.content-plan-cards {
+  display: none;
+}
+
+.content-plan-card {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+  background: white;
+}
+
+.content-plan-card h3 {
+  margin: 6px 0;
+  overflow-wrap: anywhere;
+}
+
+.content-plan-date {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.content-plan-topic {
+  margin: 0;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.content-plan-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.content-plan-meta div {
+  display: grid;
+  gap: 4px;
+}
+
+.content-plan-meta dt {
+  font-size: 12px;
+}
+
+.content-plan-meta dd {
+  overflow-wrap: anywhere;
+}
+
+.content-plan-platforms {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.content-plan-platforms h4 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.content-plan-platforms p {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 6px 0;
+}
+
+.content-plan-platforms a {
+  color: #244ca0;
+  font-weight: 650;
+}
+
+.content-plan-action {
+  margin-top: 16px;
+}
+
+.content-plan-action summary {
+  color: #244ca0;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.content-plan-platforms a:focus-visible,
+.content-plan-action summary:focus-visible {
+  outline: 0;
+  box-shadow: var(--focus-ring);
+}
+
+.content-plan-action form {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
 .compact-list {
   margin: 0;
   padding: 0;
@@ -654,6 +747,29 @@ dd {
   }
 }
 
+@media (max-width: 760px) {
+  .content-plan-table {
+    display: none;
+  }
+
+  .content-plan-cards {
+    display: grid;
+    gap: 12px;
+  }
+
+  .content-plan-form {
+    grid-template-columns: 1fr;
+  }
+
+  .content-plan-form .actions {
+    justify-content: stretch;
+  }
+
+  .content-plan-form .actions .button {
+    width: 100%;
+  }
+}
+
 @media (max-width: 600px) {
   .shell {
     width: min(100% - 24px, 1160px);
@@ -740,6 +856,11 @@ dd {
 
   .media-grid figure {
     width: 100%;
+  }
+
+  .content-plan-meta {
+    grid-template-columns: 1fr;
+    gap: 10px;
   }
 
   .table-wrap {
