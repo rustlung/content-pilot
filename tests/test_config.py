@@ -20,3 +20,8 @@ def test_settings_uses_valid_iana_timezone() -> None:
     assert str(Settings(postgres_password="test-password").timezone) == "Europe/Samara"
     with pytest.raises(ValidationError):
         Settings(postgres_password="test-password", app_timezone="not/a-timezone")
+
+
+def test_settings_builds_default_celery_broker_url() -> None:
+    settings = Settings(postgres_password="test-password")
+    assert settings.resolved_celery_broker_url == "redis://content-pilot-redis:6379/0"

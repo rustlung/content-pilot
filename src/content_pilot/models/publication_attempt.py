@@ -35,5 +35,6 @@ class PublicationAttempt(CreatedAtMixin, Base):
     )
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     external_response_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    celery_task_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
 
     post: Mapped[Post] = relationship(back_populates="publication_attempts")

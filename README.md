@@ -1,13 +1,13 @@
 # ContentPilot
 
-ContentPilot is a modular monolith for AI-assisted content planning and future social publishing. M3 adds a server-rendered Russian Web UI, manual post editing, images, and a persisted post workflow. Automatic publishing, background scheduling execution, authentication, and analytics remain out of scope.
+ContentPilot is a modular monolith for AI-assisted content planning and future social publishing. M4 adds Redis-backed Celery scheduling and a safe DryRunPublisher pipeline; real social-network publishers remain out of scope.
 
 ## Stack
 
 - Python 3.12, FastAPI, Uvicorn, Jinja2, plain CSS and vanilla JavaScript
 - PostgreSQL, SQLAlchemy 2 (synchronous), psycopg, Alembic
 - Pydantic Settings and pytest
-- Docker Compose; Redis is provisioned only as future infrastructure
+- Docker Compose, Redis as the Celery broker, Celery worker and Celery Beat
 - ProxyAPI through the OpenAI SDK, isolated behind the `content_pilot.ai` provider layer
 
 ## Project layout
@@ -15,7 +15,8 @@ ContentPilot is a modular monolith for AI-assisted content planning and future s
 ```text
 src/content_pilot/  FastAPI, settings, database primitives, ORM models, routes
   ai/               structured provider schemas, prompts, ProxyAPI client
-  services/         plan, draft-post, media, project, dashboard, and workflow logic
+  services/         plan, draft-post, media, project, dashboard, workflow, and publication persistence
+  tasks/            Celery app, due-post dispatcher, and publication task
   web/              server-rendered M3 pages, CSS, and small UX scripts
 alembic/            schema migrations
 tests/              database-free unit and metadata tests
@@ -51,16 +52,37 @@ GET  /posts/{id}               post editor and workflow actions
 Post transitions available in M3 are:
 
 ```text
-draft -> approved -> scheduled
+draft -> approved -> scheduled -> publishing -> published / failed
 draft -> cancelled
 approved -> cancelled
 scheduled -> approved  (unschedule)
 scheduled -> cancelled
 ```
 
-`APP_TIMEZONE` defaults to `Europe/Samara`. The UI accepts schedule input in that IANA timezone and the workflow stores it as UTC. Scheduling in M3 only persists the time; no scheduler or external publisher runs yet.
+`APP_TIMEZONE` defaults to `Europe/Samara`. The UI accepts schedule input in that IANA timezone and the workflow stores it as UTC. LinkedIn remains manual-only, so it cannot be scheduled for automatic publication.
 
-LinkedIn is explicitly manual: the post page provides copy-text and image-preview actions, not a publish button. VK and Telegram pages likewise show no automatic publishing controls.
+LinkedIn is explicitly manual: the post page provides copy-text and image-preview actions, not a publish button. VK and Telegram pages likewise show no direct publish buttons.
+
+## M4 scheduling
+
+PostgreSQL remains the source of truth for `scheduled_at`, status, and publication attempts. Beat periodically places only due post identifiers on Redis; a worker atomically claims a row before it invokes a publisher. This avoids relying on Celery ETA messages for schedules and lets Beat rediscover overdue posts after a restart.
+
+```text
+FastAPI -> PostgreSQL
+
+Celery Beat -> Redis -> Celery Worker -> Publisher -> PostgreSQL
+```
+
+The worker runs with `CELERY_WORKER_CONCURRENCY=1` by default. `CELERY_DISPATCH_INTERVAL_SECONDS`, `PUBLICATION_MAX_RETRIES`, and `PUBLICATION_RETRY_BASE_SECONDS` are configured in `.env`. Retryable provider failures use exponential backoff; task results are not stored in Redis because lifecycle state is persisted in PostgreSQL.
+
+No real publisher exists in M4. For the deliberate local acceptance scenario only, set `APP_ENV=development` and `PUBLISHING_DRY_RUN=true`; `DryRunPublisher` then returns a `dry-run:<uuid>` external ID without making HTTP requests. With dry-run disabled, a scheduled VK/Telegram post safely becomes `failed` with a publisher-unavailable error. M5 will provide real adapters.
+
+```powershell
+docker compose up -d --build
+docker compose exec content-pilot-api alembic upgrade head
+docker compose logs -f content-pilot-beat
+docker compose logs -f content-pilot-worker
+```
 
 ## M2 AI configuration and JSON API
 

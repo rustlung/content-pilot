@@ -1,4 +1,4 @@
-"""Application-level post workflow; M3 performs no external publication."""
+"""Application-level manual workflow; Celery owns M4 publication execution."""
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from content_pilot.models.enums import PostStatus
+from content_pilot.models.enums import Platform
 from content_pilot.models.post import Post
 from content_pilot.services.errors import ConflictError, NotFoundError, ValidationDomainError
 
@@ -41,6 +42,8 @@ def schedule_post(session: Session, post_id: object, scheduled_at: datetime) -> 
     post = _post(session, post_id)
     if post.status is not PostStatus.APPROVED:
         raise ConflictError("Only an approved post can be scheduled")
+    if post.platform is Platform.LINKEDIN:
+        raise ConflictError("LinkedIn posts are published manually and cannot be scheduled automatically")
     if scheduled_at.tzinfo is None or scheduled_at.utcoffset() is None:
         raise ValidationDomainError("scheduled_at must be timezone-aware")
     scheduled_utc = scheduled_at.astimezone(timezone.utc)

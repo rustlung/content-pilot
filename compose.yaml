@@ -42,6 +42,13 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me}
       REDIS_HOST: content-pilot-redis
       REDIS_PORT: 6379
+      REDIS_DB: ${REDIS_DB:-0}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-}
+      CELERY_DISPATCH_INTERVAL_SECONDS: ${CELERY_DISPATCH_INTERVAL_SECONDS:-60}
+      CELERY_WORKER_CONCURRENCY: ${CELERY_WORKER_CONCURRENCY:-1}
+      PUBLICATION_MAX_RETRIES: ${PUBLICATION_MAX_RETRIES:-3}
+      PUBLICATION_RETRY_BASE_SECONDS: ${PUBLICATION_RETRY_BASE_SECONDS:-30}
+      PUBLISHING_DRY_RUN: ${PUBLISHING_DRY_RUN:-false}
       PROXYAPI_API_KEY: ${PROXYAPI_API_KEY:-}
       PROXYAPI_BASE_URL: ${PROXYAPI_BASE_URL:-https://api.proxyapi.ru/v1}
       AI_TEXT_MODEL: ${AI_TEXT_MODEL:-openai/gpt-4.1-mini}
@@ -61,6 +68,40 @@ services:
       - content-pilot-media:/app/data/media
     networks:
       - content-pilot-network
+
+  content-pilot-worker:
+    build: .
+    container_name: content-pilot-worker
+    command: celery -A content_pilot.tasks.celery_app:celery_app worker --loglevel=INFO --concurrency=${CELERY_WORKER_CONCURRENCY:-1}
+    environment: &celery-environment
+      APP_ENV: ${APP_ENV:-development}
+      POSTGRES_HOST: content-pilot-db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-content_pilot}
+      POSTGRES_USER: ${POSTGRES_USER:-content_pilot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me}
+      REDIS_HOST: content-pilot-redis
+      REDIS_PORT: 6379
+      REDIS_DB: ${REDIS_DB:-0}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-}
+      CELERY_DISPATCH_INTERVAL_SECONDS: ${CELERY_DISPATCH_INTERVAL_SECONDS:-60}
+      PUBLICATION_MAX_RETRIES: ${PUBLICATION_MAX_RETRIES:-3}
+      PUBLICATION_RETRY_BASE_SECONDS: ${PUBLICATION_RETRY_BASE_SECONDS:-30}
+      PUBLISHING_DRY_RUN: ${PUBLISHING_DRY_RUN:-false}
+    depends_on:
+      content-pilot-db: {condition: service_healthy}
+      content-pilot-redis: {condition: service_healthy}
+    networks: [content-pilot-network]
+
+  content-pilot-beat:
+    build: .
+    container_name: content-pilot-beat
+    command: celery -A content_pilot.tasks.celery_app:celery_app beat --loglevel=INFO
+    environment: *celery-environment
+    depends_on:
+      content-pilot-db: {condition: service_healthy}
+      content-pilot-redis: {condition: service_healthy}
+    networks: [content-pilot-network]
 
 volumes:
   content-pilot-postgres-data:

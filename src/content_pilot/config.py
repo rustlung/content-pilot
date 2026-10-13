@@ -29,6 +29,13 @@ class Settings(BaseSettings):
 
     redis_host: str = "content-pilot-redis"
     redis_port: int = Field(default=6379, ge=1, le=65535)
+    redis_db: int = Field(default=0, ge=0)
+    celery_broker_url: str | None = None
+    celery_dispatch_interval_seconds: int = Field(default=60, ge=10)
+    celery_worker_concurrency: int = Field(default=1, ge=1)
+    publication_max_retries: int = Field(default=3, ge=0)
+    publication_retry_base_seconds: int = Field(default=30, ge=1)
+    publishing_dry_run: bool = False
 
     proxyapi_api_key: SecretStr | None = None
     proxyapi_base_url: str = "https://api.proxyapi.ru/v1"
@@ -49,6 +56,10 @@ class Settings(BaseSettings):
     @cached_property
     def timezone(self) -> ZoneInfo:
         return ZoneInfo(self.app_timezone)
+
+    @cached_property
+    def resolved_celery_broker_url(self) -> str:
+        return self.celery_broker_url or f"redis://{self.redis_host}:{self.redis_port}/{self.redis_db}"
 
     @cached_property
     def sqlalchemy_database_url(self) -> str:

@@ -20,7 +20,7 @@ from content_pilot.services.post_workflow import approve_post, cancel_post, sche
 def post(session: Session) -> Post:
     project = Project(name="Workflow project")
     item = ContentItem(project=project, title="Workflow item", content_type="educational")
-    post = Post(content_item=item, platform=Platform.LINKEDIN, text="Черновик для проверки workflow.")
+    post = Post(content_item=item, platform=Platform.VK, text="Черновик для проверки workflow.")
     session.add(post)
     session.commit()
     return post
@@ -53,6 +53,18 @@ def test_approve_schedule_unschedule_and_cancel(session: Session, post: Post) ->
 
 def test_draft_can_be_cancelled(session: Session, post: Post) -> None:
     assert cancel_post(session, post.id).status is PostStatus.CANCELLED
+
+
+def test_linkedin_auto_schedule_is_rejected(session: Session) -> None:
+    project = Project(name="Manual LinkedIn project")
+    item = ContentItem(project=project, title="Manual item", content_type="educational")
+    post = Post(content_item=item, platform=Platform.LINKEDIN, text="Текст для ручной публикации.")
+    session.add(post)
+    session.commit()
+
+    approve_post(session, post.id)
+    with pytest.raises(ConflictError, match="LinkedIn"):
+        schedule_post(session, post.id, future_samara_time())
 
 
 def test_invalid_transitions_and_past_schedule_fail(session: Session, post: Post) -> None:

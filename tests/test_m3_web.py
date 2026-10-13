@@ -42,7 +42,14 @@ def test_web_workflow_and_manual_linkedin_mode(client: TestClient) -> None:
     assert "/media/" in client.get(post_url).text
     assert client.post(f"/posts/{post_id}/approve", follow_redirects=False).status_code == 303
     future = (datetime.now() + timedelta(days=1)).replace(second=0, microsecond=0).isoformat(timespec="minutes")
-    assert client.post(f"/posts/{post_id}/schedule", data={"scheduled_at": future}, follow_redirects=False).status_code == 303
+    assert client.post(f"/posts/{post_id}/schedule", data={"scheduled_at": future}, follow_redirects=False).status_code == 409
+    generated_vk = client.post(
+        f"/content-items/{item_id}/posts/generate", data={"platform": "vk"}, follow_redirects=False
+    )
+    vk_post_url = generated_vk.headers["location"].split("?")[0]
+    vk_post_id = vk_post_url.rsplit("/", 1)[-1]
+    assert client.post(f"/posts/{vk_post_id}/approve", follow_redirects=False).status_code == 303
+    assert client.post(f"/posts/{vk_post_id}/schedule", data={"scheduled_at": future}, follow_redirects=False).status_code == 303
     dashboard = client.get("/")
     assert "Контент-план: 1" in dashboard.text
     assert "Запланировано: 1" in dashboard.text
@@ -52,5 +59,5 @@ def test_web_workflow_and_manual_linkedin_mode(client: TestClient) -> None:
     assert f'href="/projects/{project_id}"' in projects_page.text
     assert "project-name-link" in projects_page.text
     assert "action-column" in projects_page.text
-    assert client.post(f"/posts/{post_id}/unschedule", follow_redirects=False).status_code == 303
-    assert client.post(f"/posts/{post_id}/cancel", follow_redirects=False).status_code == 303
+    assert client.post(f"/posts/{vk_post_id}/unschedule", follow_redirects=False).status_code == 303
+    assert client.post(f"/posts/{vk_post_id}/cancel", follow_redirects=False).status_code == 303

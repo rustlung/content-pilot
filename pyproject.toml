@@ -5,12 +5,14 @@ description = "Content planning and social publishing foundation"
 requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.13,<2",
+    "celery[redis]>=5.4,<6",
     "fastapi>=0.115,<1",
     "httpx>=0.27,<1",
     "jinja2>=3.1,<4",
     "openai>=1.0,<2",
     "psycopg[binary]>=3.2,<4",
     "pydantic-settings>=2.6,<3",
+    "redis>=5,<7",
     "python-multipart>=0.0.9,<1",
     "python-dotenv>=1.0,<2",
     "sqlalchemy>=2.0,<3",
