@@ -77,3 +77,33 @@ def list_media(session: Session, post_id: object) -> list[MediaAsset]:
     if session.get(Post, post_id) is None:
         raise NotFoundError("Post not found")
     return list(session.scalars(select(MediaAsset).where(MediaAsset.post_id == post_id)))
+
+
+def get_media_asset(session: Session, media_id: object) -> MediaAsset:
+    """Return one asset with its post, without exposing a stored filesystem path."""
+    asset = session.scalar(
+        select(MediaAsset).options(joinedload(MediaAsset.post)).where(MediaAsset.id == media_id)
+    )
+    if asset is None:
+        raise NotFoundError("Изображение не найдено")
+    return asset
+
+
+def resolve_media_file(asset: MediaAsset, media_root: Path) -> Path:
+    """Resolve a stored relative path only when it remains a regular file under MEDIA_ROOT."""
+    if not asset.file_path:
+        raise NotFoundError("Файл изображения недоступен")
+
+    relative_path = Path(asset.file_path)
+    if relative_path.is_absolute():
+        raise NotFoundError("Файл изображения недоступен")
+
+    root = media_root.resolve()
+    candidate = (root / relative_path).resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError as error:
+        raise NotFoundError("Файл изображения недоступен") from error
+    if not candidate.is_file():
+        raise NotFoundError("Файл изображения недоступен")
+    return candidate

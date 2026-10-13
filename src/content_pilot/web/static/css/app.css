@@ -448,12 +448,14 @@ dd {
 
 .media-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 640px));
   gap: 16px;
+  justify-content: start;
 }
 
 .media-grid figure {
   margin: 0;
+  max-width: 640px;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -461,14 +463,22 @@ dd {
 
 .media-grid img {
   display: block;
-  width: 100%;
-  aspect-ratio: 1;
-  object-fit: cover;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+}
+
+.media-preview {
+  display: block;
 }
 
 .media-grid figcaption {
   padding: 10px;
   font-size: 13px;
+}
+
+.media-download {
+  margin-top: 10px;
 }
 
 .empty,
@@ -715,6 +725,11 @@ dd {
 
   .projects-table .action-column {
     display: none;
+  }
+
+  .media-grid,
+  .media-grid figure {
+    max-width: 100%;
   }
 
   .table-wrap {

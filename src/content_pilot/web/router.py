@@ -2,13 +2,14 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+import mimetypes
 from pathlib import Path
 from urllib.parse import urlencode
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
@@ -20,7 +21,7 @@ from content_pilot.models.enums import ContentItemStatus, Platform, PostStatus, 
 from content_pilot.services.content_plans import generate_content_plan, list_content_items
 from content_pilot.services.dashboard import dashboard_data, project_analytics
 from content_pilot.services.errors import ValidationDomainError
-from content_pilot.services.media import generate_image
+from content_pilot.services.media import generate_image, get_media_asset, resolve_media_file
 from content_pilot.services.post_workflow import approve_post, cancel_post, schedule_post, unschedule_post
 from content_pilot.services.posts import generate_post, get_post, update_draft_post_text
 from content_pilot.services.projects import create_project, get_project, list_projects
@@ -152,8 +153,28 @@ def post_generate(
 @router.get("/posts/{post_id}", response_class=HTMLResponse)
 def post_detail(request: Request, post_id: UUID, session: Session = Depends(get_session)) -> HTMLResponse:
     post = get_post(session, post_id)
-    media = [{"asset": asset, "url": str(request.url_for("media", path=asset.file_path)) if asset.file_path else None} for asset in post.media_assets]
+    media = [
+        {
+            "asset": asset,
+            "url": str(request.url_for("media", path=asset.file_path)) if asset.file_path else None,
+            "download_url": str(request.url_for("media_download", media_id=asset.id)),
+        }
+        for asset in post.media_assets
+    ]
     return render(request, "post_detail.html", post=post, media=media)
+
+
+@router.get("/downloads/media/{media_id}", name="media_download")
+def media_download(
+    request: Request, media_id: UUID, session: Session = Depends(get_session)
+) -> FileResponse:
+    """Download the original stored asset through its database identifier."""
+    asset = get_media_asset(session, media_id)
+    source = resolve_media_file(asset, request.app.state.settings.media_root)
+    extension = source.suffix.lower() or ".png"
+    filename = f"contentpilot-{asset.post.platform.value}-{asset.post_id}{extension}"
+    media_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    return FileResponse(source, media_type=media_type, filename=filename)
 
 
 @router.post("/posts/{post_id}/edit")
