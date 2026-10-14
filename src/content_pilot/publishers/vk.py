@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from contextlib import nullcontext
+import logging
 from typing import Any, Iterator, Sequence
 
 import httpx
@@ -15,6 +16,8 @@ from content_pilot.publishers.base import (
     PublisherRetryableError,
     PublisherUnavailableError,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class VkPublisher:
@@ -66,6 +69,14 @@ class VkPublisher:
         if not isinstance(payload, dict):
             raise PublisherPermanentError("VK returned an invalid response")
         if "error" in payload:
+            error = payload["error"]
+            error_code = error.get("error_code") if isinstance(error, dict) else None
+            error_message = error.get("error_msg") if isinstance(error, dict) else None
+            safe_message = _safe_error_message(error_message)
+            safe_code = error_code if isinstance(error_code, int) else "unknown"
+            logger.warning('VK API error code=%s message="%s"', safe_code, safe_message)
+            if isinstance(error_code, int):
+                raise PublisherPermanentError(f"VK rejected the publication request (code {error_code})")
             raise PublisherPermanentError("VK rejected the publication request")
         response_data = payload.get("response")
         if not isinstance(response_data, dict) or not isinstance(response_data.get("post_id"), int):
@@ -76,3 +87,10 @@ class VkPublisher:
             warnings = ("VK image upload is unavailable; publish attached media manually.",)
         external_id = f"vk:wall-{self._group_id}_{response_data['post_id']}"
         return PublicationResult(external_id, warnings=warnings)
+
+
+def _safe_error_message(value: object) -> str:
+    """Return diagnostic text suitable for logs without retaining raw payloads."""
+    if not isinstance(value, str) or not value.strip():
+        return "No message"
+    return " ".join(value.split()).replace('"', "'")[:500]

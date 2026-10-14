@@ -1,6 +1,7 @@
 """M5 publisher adapters use httpx MockTransport only; no real post is sent."""
 from __future__ import annotations
 
+import logging
 import uuid
 from pathlib import Path
 from urllib.parse import parse_qs
@@ -136,10 +137,19 @@ def test_vk_transient_http_failures_are_retryable(status: int) -> None:
         publisher.publish(post(Platform.VK), [])
 
 
-def test_vk_api_error_is_permanent() -> None:
-    publisher = VkPublisher(settings(), client(lambda request: httpx.Response(200, json={"error": {"error_code": 15}})))
-    with pytest.raises(PublisherPermanentError):
-        publisher.publish(post(Platform.VK), [])
+def test_vk_api_error_is_permanent_and_logs_safe_diagnostics(caplog: pytest.LogCaptureFixture) -> None:
+    token = "vk-secret-token-must-not-appear-in-logs"
+    publisher = VkPublisher(
+        settings(vk_access_token=token),
+        client(lambda request: httpx.Response(200, json={"error": {"error_code": 15, "error_msg": "Access denied"}})),
+    )
+
+    with caplog.at_level(logging.WARNING, logger="content_pilot.publishers.vk"):
+        with pytest.raises(PublisherPermanentError, match=r"VK rejected the publication request \(code 15\)"):
+            publisher.publish(post(Platform.VK), [])
+
+    assert 'VK API error code=15 message="Access denied"' in caplog.text
+    assert token not in caplog.text
 
 
 def test_registry_prefers_dry_run_and_rejects_linkedin() -> None:
