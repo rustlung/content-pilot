@@ -53,7 +53,7 @@ services:
       content-pilot-db:
         condition: service_healthy
     ports:
-      - "127.0.0.1:${CONTENT_PILOT_HOST_PORT:-8000}:8000"
+      - "${CONTENT_PILOT_BIND_ADDRESS:-127.0.0.1}:${CONTENT_PILOT_HOST_PORT:-8000}:8000"
     volumes:
       - content-pilot-prod-media:/app/data/media
     healthcheck:
