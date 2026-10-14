@@ -10,6 +10,28 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL
 
 
+class CeleryBootstrapSettings(BaseSettings):
+    """Minimal import-safe configuration needed to construct the Celery app.
+
+    Worker and Beat import this configuration before task execution, so it must
+    not require database, AI, or social-provider credentials. Those settings
+    remain validated by :class:`Settings` when a task opens application runtime
+    resources.
+    """
+
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    redis_host: str = "content-pilot-redis"
+    redis_port: int = Field(default=6379, ge=1, le=65535)
+    redis_db: int = Field(default=0, ge=0)
+    celery_broker_url: str | None = None
+    celery_dispatch_interval_seconds: int = Field(default=60, ge=10)
+
+    @cached_property
+    def resolved_broker_url(self) -> str:
+        return self.celery_broker_url or f"redis://{self.redis_host}:{self.redis_port}/{self.redis_db}"
+
+
 class Settings(BaseSettings):
     """Runtime settings. Secrets are never included in application logs."""
 
