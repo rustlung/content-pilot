@@ -63,6 +63,20 @@ def unschedule_post(session: Session, post_id: object) -> Post:
     return _commit(session, post)
 
 
+def return_post_to_draft(session: Session, post_id: object) -> Post:
+    """Reopen an approved or failed post without losing its publication history."""
+    post = _post(session, post_id)
+    if post.status not in {PostStatus.APPROVED, PostStatus.FAILED}:
+        raise ConflictError("Only an approved or failed post can be returned to draft")
+
+    post.status = PostStatus.DRAFT
+    post.scheduled_at = None
+    post.published_at = None
+    post.external_post_id = None
+    post.last_error = None
+    return _commit(session, post)
+
+
 def cancel_post(session: Session, post_id: object) -> Post:
     post = _post(session, post_id)
     if post.status not in {PostStatus.DRAFT, PostStatus.APPROVED, PostStatus.SCHEDULED}:

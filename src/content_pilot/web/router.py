@@ -22,9 +22,17 @@ from content_pilot.services.content_plans import generate_content_plan, list_con
 from content_pilot.services.dashboard import dashboard_data, project_analytics
 from content_pilot.services.errors import ValidationDomainError
 from content_pilot.services.media import generate_image, get_media_asset, resolve_media_file
-from content_pilot.services.post_workflow import approve_post, cancel_post, schedule_post, unschedule_post
+from content_pilot.services.post_workflow import (
+    approve_post,
+    cancel_post,
+    return_post_to_draft,
+    schedule_post,
+    unschedule_post,
+)
+from content_pilot.services.publication import queue_failed_post_for_manual_retry
 from content_pilot.services.posts import generate_post, get_post, update_draft_post_text
 from content_pilot.services.projects import create_project, get_project, list_projects
+from content_pilot.tasks.publishing import publish_post
 
 
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
@@ -219,6 +227,19 @@ def post_schedule(
 def post_unschedule(post_id: UUID, session: Session = Depends(get_session)) -> RedirectResponse:
     unschedule_post(session, post_id)
     return redirect(f"/posts/{post_id}", "Расписание снято: пост снова подтверждён")
+
+
+@router.post("/posts/{post_id}/return-to-draft")
+def post_return_to_draft(post_id: UUID, session: Session = Depends(get_session)) -> RedirectResponse:
+    return_post_to_draft(session, post_id)
+    return redirect(f"/posts/{post_id}", "Пост возвращён в черновик")
+
+
+@router.post("/posts/{post_id}/retry-publication")
+def post_retry_publication(post_id: UUID, session: Session = Depends(get_session)) -> RedirectResponse:
+    post = queue_failed_post_for_manual_retry(session, post_id)
+    publish_post.delay(str(post.id))
+    return redirect(f"/posts/{post_id}", "Повторная публикация поставлена в очередь")
 
 
 @router.post("/posts/{post_id}/cancel")

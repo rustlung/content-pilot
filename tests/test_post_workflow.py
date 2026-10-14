@@ -9,11 +9,19 @@ from sqlalchemy.orm import Session, sessionmaker
 from content_pilot.db.base import Base
 import content_pilot.models  # noqa: F401
 from content_pilot.models.content_item import ContentItem
-from content_pilot.models.enums import Platform, PostStatus
+from content_pilot.models.enums import MediaSource, MediaType, Platform, PostStatus, PublicationAttemptStatus
+from content_pilot.models.media_asset import MediaAsset
 from content_pilot.models.post import Post
 from content_pilot.models.project import Project
+from content_pilot.models.publication_attempt import PublicationAttempt
 from content_pilot.services.errors import ConflictError, ValidationDomainError
-from content_pilot.services.post_workflow import approve_post, cancel_post, schedule_post, unschedule_post
+from content_pilot.services.post_workflow import (
+    approve_post,
+    cancel_post,
+    return_post_to_draft,
+    schedule_post,
+    unschedule_post,
+)
 
 
 @pytest.fixture
@@ -82,3 +90,56 @@ def test_invalid_transitions_and_past_schedule_fail(session: Session, post: Post
     session.commit()
     with pytest.raises(ConflictError):
         schedule_post(session, post.id, future_samara_time())
+
+
+def test_approved_post_can_return_to_draft_after_unschedule(session: Session, post: Post) -> None:
+    approve_post(session, post.id)
+    schedule_post(session, post.id, future_samara_time())
+    assert unschedule_post(session, post.id).status is PostStatus.APPROVED
+
+    returned = return_post_to_draft(session, post.id)
+
+    assert returned.status is PostStatus.DRAFT
+    assert returned.scheduled_at is None
+    assert returned.text == "Черновик для проверки workflow."
+
+
+def test_failed_post_can_return_to_draft_without_losing_media_or_attempts(session: Session, post: Post) -> None:
+    post.status = PostStatus.FAILED
+    post.scheduled_at = datetime.now(timezone.utc)
+    post.published_at = datetime.now(timezone.utc)
+    post.external_post_id = "old-external-id"
+    post.last_error = "safe publisher error"
+    session.add_all(
+        [
+            MediaAsset(
+                post=post,
+                media_type=MediaType.IMAGE,
+                source=MediaSource.AI,
+                file_path="project/post/image.png",
+            ),
+            PublicationAttempt(
+                post=post,
+                attempt_no=1,
+                status=PublicationAttemptStatus.FAILED,
+                error="safe publisher error",
+            ),
+        ]
+    )
+    session.commit()
+
+    returned = return_post_to_draft(session, post.id)
+
+    assert returned.status is PostStatus.DRAFT
+    assert returned.text == "Черновик для проверки workflow."
+    assert returned.scheduled_at is None
+    assert returned.published_at is None
+    assert returned.external_post_id is None
+    assert returned.last_error is None
+    assert len(returned.media_assets) == 1
+    assert len(returned.publication_attempts) == 1
+
+
+def test_return_to_draft_rejects_invalid_status(session: Session, post: Post) -> None:
+    with pytest.raises(ConflictError):
+        return_post_to_draft(session, post.id)

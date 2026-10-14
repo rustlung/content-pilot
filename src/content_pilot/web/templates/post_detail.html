@@ -45,6 +45,14 @@
     {% elif post.status.value == 'scheduled' %}
       <form method="post" action="/posts/{{ post.id }}/unschedule"><button class="button button-secondary" type="submit">Снять с расписания</button></form>
     {% endif %}
+    {% if post.status.value in ['approved', 'failed'] %}
+      <form method="post" action="/posts/{{ post.id }}/return-to-draft" data-confirm="Вернуть пост в черновик? Планирование и последняя ошибка будут очищены."><button class="button button-secondary" type="submit">Вернуть в черновик</button></form>
+    {% endif %}
+    {% if post.status.value == 'failed' and post.platform.value in ['vk', 'telegram'] %}
+      <form method="post" action="/posts/{{ post.id }}/retry-publication" data-submit-once>
+        <button class="button" type="submit" data-loading-text="Постановка в очередь…">Повторить публикацию</button>
+      </form>
+    {% endif %}
     {% if post.status.value in ['draft', 'approved', 'scheduled'] %}
       <form method="post" action="/posts/{{ post.id }}/cancel" data-confirm="Отменить этот пост?"><button class="button button-danger" type="submit">Отменить</button></form>
     {% endif %}

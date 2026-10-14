@@ -121,3 +121,65 @@ def test_post_detail_renders_publication_history_and_vk_media_note(tmp_path) -> 
     assert "vk:wall-1_2" in response.text
     assert "Текст опубликован в VK" in response.text
     assert "доступно ниже для ручной публикации" in response.text
+
+
+def test_failed_post_is_openable_from_plan_and_shows_recovery_actions(tmp_path) -> None:
+    engine = create_engine(
+        "sqlite+pysqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    session = sessionmaker(engine)()
+    project = Project(name="Recovery project")
+    item = ContentItem(project=project, title="Failed VK item", content_type="educational")
+    post = Post(
+        content_item=item,
+        platform=Platform.VK,
+        text="Existing failed post",
+        status=PostStatus.FAILED,
+        last_error="Safe publisher error",
+    )
+    session.add(post)
+    session.commit()
+    app = create_app(Settings(postgres_password="test-password", media_root=tmp_path))
+    app.dependency_overrides[get_session] = lambda: session
+
+    with TestClient(app) as client:
+        plan = client.get(f"/projects/{project.id}/plan")
+        detail = client.get(f"/posts/{post.id}")
+
+    assert plan.status_code == 200
+    assert f'href="/posts/{post.id}"' in plan.text
+    assert "Ошибка" in plan.text
+    assert "Открыть пост" in plan.text
+    assert detail.status_code == 200
+    assert f"/posts/{post.id}/retry-publication" in detail.text
+    assert f"/posts/{post.id}/return-to-draft" in detail.text
+
+
+def test_manual_retry_route_queues_a_failed_post_only_once(tmp_path, monkeypatch) -> None:
+    engine = create_engine(
+        "sqlite+pysqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    session = sessionmaker(engine)()
+    project = Project(name="Retry route project")
+    item = ContentItem(project=project, title="Retry item", content_type="educational")
+    post = Post(content_item=item, platform=Platform.TELEGRAM, text="Retry", status=PostStatus.FAILED)
+    session.add(post)
+    session.commit()
+    queued: list[str] = []
+    monkeypatch.setattr("content_pilot.web.router.publish_post.delay", queued.append)
+    app = create_app(Settings(postgres_password="test-password", media_root=tmp_path))
+    app.dependency_overrides[get_session] = lambda: session
+
+    with TestClient(app) as client:
+        first = client.post(f"/posts/{post.id}/retry-publication", follow_redirects=False)
+        second = client.post(f"/posts/{post.id}/retry-publication", follow_redirects=False)
+
+    assert first.status_code == 303
+    assert second.status_code == 409
+    assert queued == [str(post.id)]

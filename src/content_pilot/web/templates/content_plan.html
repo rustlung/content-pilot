@@ -43,19 +43,23 @@
             <div class="post-badges">
               {% for platform in platforms %}
               {% set found = item.posts|selectattr('platform', 'equalto', platform)|list %}
-              <span>{{ platform_labels[platform] }}: {% if found %}<a href="/posts/{{ found[0].id }}">{{ post_status_labels[found[0].status] }}</a>{% else %}—{% endif %}</span>
+              <span>{{ platform_labels[platform] }}: {% if found %}{% if found[0].status.value == 'failed' %}Ошибка <a href="/posts/{{ found[0].id }}">Открыть пост</a>{% else %}<a href="/posts/{{ found[0].id }}">{{ post_status_labels[found[0].status] }}</a>{% endif %}{% else %}—{% endif %}</span>
               {% endfor %}
             </div>
           </td>
           <td>
+            {% if item.posts|length < platforms|length %}
             <details>
               <summary>Создать пост</summary>
               <form method="post" action="/content-items/{{ item.id }}/posts/generate" data-ai-form>
-                <select name="platform">{% for platform in platforms %}<option value="{{ platform.value }}">{{ platform_labels[platform] }}</option>{% endfor %}</select>
+                <select name="platform">{% for platform in platforms %}{% set found = item.posts|selectattr('platform', 'equalto', platform)|list %}{% if not found %}<option value="{{ platform.value }}">{{ platform_labels[platform] }}</option>{% endif %}{% endfor %}</select>
                 <input name="instructions" placeholder="Дополнительные инструкции">
                 <button class="link-button" data-loading-text="Генерация…">Сгенерировать</button>
               </form>
             </details>
+            {% else %}
+            <span class="muted">Посты созданы</span>
+            {% endif %}
           </td>
         </tr>
         {% endfor %}
@@ -78,17 +82,21 @@
         <h4>Посты по платформам</h4>
         {% for platform in platforms %}
         {% set found = item.posts|selectattr('platform', 'equalto', platform)|list %}
-        <p><span>{{ platform_labels[platform] }}</span>{% if found %}<a href="/posts/{{ found[0].id }}">{{ post_status_labels[found[0].status] }}</a>{% else %}<span>—</span>{% endif %}</p>
+        <p><span>{{ platform_labels[platform] }}</span>{% if found %}{% if found[0].status.value == 'failed' %}<span>Ошибка</span><a href="/posts/{{ found[0].id }}">Открыть пост</a>{% else %}<a href="/posts/{{ found[0].id }}">{{ post_status_labels[found[0].status] }}</a>{% endif %}{% else %}<span>—</span>{% endif %}</p>
         {% endfor %}
       </div>
+      {% if item.posts|length < platforms|length %}
       <details class="content-plan-action">
         <summary>Создать пост</summary>
         <form method="post" action="/content-items/{{ item.id }}/posts/generate" data-ai-form>
-          <label>Платформа<select name="platform">{% for platform in platforms %}<option value="{{ platform.value }}">{{ platform_labels[platform] }}</option>{% endfor %}</select></label>
+          <label>Платформа<select name="platform">{% for platform in platforms %}{% set found = item.posts|selectattr('platform', 'equalto', platform)|list %}{% if not found %}<option value="{{ platform.value }}">{{ platform_labels[platform] }}</option>{% endif %}{% endfor %}</select></label>
           <label>Дополнительные инструкции<input name="instructions"></label>
           <button class="button" type="submit" data-loading-text="Генерация…">Сгенерировать</button>
         </form>
       </details>
+      {% else %}
+      <p class="muted">Посты для всех платформ уже созданы.</p>
+      {% endif %}
     </article>
     {% endfor %}
   </div>

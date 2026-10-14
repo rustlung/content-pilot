@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
+import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -18,9 +19,11 @@ from content_pilot.services.publication import (
     claim_scheduled_post,
     finish_failure,
     finish_success,
+    queue_failed_post_for_manual_retry,
     start_attempt,
     task_owns_publishing_post,
 )
+from content_pilot.services.errors import ConflictError
 from content_pilot.tasks import publishing
 from content_pilot.tasks import scheduling
 import content_pilot.models  # noqa: F401
@@ -127,6 +130,68 @@ def test_final_failure_marks_post_failed() -> None:
     stored = session.get(Post, post.id)
     assert stored.status is PostStatus.FAILED
     assert stored.last_error == "publisher unavailable"
+
+
+def test_manual_retry_reuses_failed_post_and_continues_attempt_history(monkeypatch) -> None:
+    engine = create_engine(
+        "sqlite+pysqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(engine, expire_on_commit=False)
+    with factory() as session:
+        post = make_post(session, status=PostStatus.FAILED, scheduled_at=None)
+        session.add(
+            PublicationAttempt(
+                post_id=post.id,
+                attempt_no=1,
+                status=PublicationAttemptStatus.FAILED,
+                error="previous safe error",
+            )
+        )
+        session.commit()
+        post_id = str(post.id)
+        queued = queue_failed_post_for_manual_retry(session, post.id)
+        assert queued.status is PostStatus.SCHEDULED
+        assert queued.last_error is None
+        with pytest.raises(ConflictError):
+            queue_failed_post_for_manual_retry(session, post.id)
+
+    class FakePublisher:
+        def publish(self, post: Post, media) -> publishing.PublicationResult:
+            return publishing.PublicationResult("fake:manual-retry")
+
+    monkeypatch.setattr(publishing, "get_session_factory", lambda: factory)
+    monkeypatch.setattr(publishing, "get_publication_settings", lambda: PublicationSettings(_env_file=None))
+    monkeypatch.setattr(publishing, "resolve_publisher", lambda platform, settings: FakePublisher())
+
+    publishing.publish_post.apply(args=[post_id], task_id="manual-retry-task").get()
+
+    with factory() as session:
+        stored = session.get(Post, post.id)
+        attempts = list(
+            session.scalars(
+                select(PublicationAttempt)
+                .where(PublicationAttempt.post_id == post.id)
+                .order_by(PublicationAttempt.attempt_no)
+            )
+        )
+    assert stored.status is PostStatus.PUBLISHED
+    assert [attempt.attempt_no for attempt in attempts] == [1, 2]
+    assert [attempt.status for attempt in attempts] == [PublicationAttemptStatus.FAILED, PublicationAttemptStatus.SUCCESS]
+
+
+def test_manual_retry_rejects_linkedin_post() -> None:
+    session = make_session()
+    project = Project(name="Manual retry project")
+    item = ContentItem(project=project, title="LinkedIn item", content_type="educational")
+    post = Post(content_item=item, platform=Platform.LINKEDIN, text="Manual", status=PostStatus.FAILED)
+    session.add(post)
+    session.commit()
+
+    with pytest.raises(ConflictError, match="automatically"):
+        queue_failed_post_for_manual_retry(session, post.id)
 
 
 def test_task_publishes_once_and_duplicate_task_skips(monkeypatch) -> None:
