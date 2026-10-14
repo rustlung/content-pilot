@@ -6,14 +6,31 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${PROJECT_ROOT}"
 
 COMPOSE_FILE="${CONTENT_PILOT_COMPOSE_FILE:-compose.prod.yaml}"
-ENV_FILE="${CONTENT_PILOT_ENV_FILE:-.env}"
+ENV_FILE="${CONTENT_PILOT_ENV_FILE:-.env.production}"
 
-if [[ -z "${CONTENT_PILOT_IMAGE:-}" ]]; then
-  echo "CONTENT_PILOT_IMAGE must be set to a GHCR image tag." >&2
+if [[ ! -f "${ENV_FILE}" ]]; then
+  echo "Production environment file not found: ${ENV_FILE}" >&2
+  echo "Set CONTENT_PILOT_ENV_FILE to override it." >&2
   exit 1
 fi
 
 compose=(docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}")
+
+# Let Docker Compose parse the env file instead of sourcing it as shell code.
+# A non-empty shell value deliberately takes precedence over the env file.
+if [[ -z "${CONTENT_PILOT_IMAGE:-}" ]]; then
+  if ! compose_environment="$("${compose[@]}" config --environment)"; then
+    echo "Unable to read Docker Compose environment from ${ENV_FILE}." >&2
+    exit 1
+  fi
+  CONTENT_PILOT_IMAGE="$(printf '%s\n' "${compose_environment}" | awk -F= '$1 == "CONTENT_PILOT_IMAGE" { sub(/^[^=]*=/, ""); print; exit }')"
+fi
+
+if [[ -z "${CONTENT_PILOT_IMAGE:-}" ]]; then
+  echo "CONTENT_PILOT_IMAGE must be set in the shell or in ${ENV_FILE}." >&2
+  exit 1
+fi
+export CONTENT_PILOT_IMAGE
 
 "${compose[@]}" pull
 "${compose[@]}" up -d content-pilot-db content-pilot-redis

@@ -16,7 +16,7 @@ PostgreSQL и Redis не публикуют порты на host. API по ум�
 
 ## Подготовка конфигурации
 
-На сервере рядом с `compose.prod.yaml` создайте `.env` на основе
+На сервере рядом с `compose.prod.yaml` создайте `.env.production` на основе
 `.env.production.example`. Этот файл остаётся только на сервере и не должен
 попадать в Git.
 
@@ -47,11 +47,29 @@ docker login ghcr.io
 
 Скопируйте в deployment directory как минимум `compose.prod.yaml`,
 `.env.production.example` (только как образец) и `scripts/deploy.sh`. После
-подготовки server-side `.env` выполните:
+подготовки server-side `.env.production` выполните:
 
 ```bash
-CONTENT_PILOT_IMAGE=ghcr.io/<github-owner>/content-pilot:sha-<commit-sha> \
-bash scripts/deploy.sh
+./scripts/deploy.sh
+```
+
+По умолчанию helper использует `.env.production` и `compose.prod.yaml`.
+`CONTENT_PILOT_IMAGE` читается Docker Compose из `.env.production`; файл не
+исполняется как shell script. Если значение передано через shell, оно имеет
+приоритет над env-файлом.
+
+Например, для разового deploy конкретного immutable SHA image:
+
+```bash
+CONTENT_PILOT_IMAGE=ghcr.io/<github-owner>/content-pilot:sha-<commit-sha> ./scripts/deploy.sh
+```
+
+Дополнительные необязательные overrides для нестандартного размещения:
+
+```bash
+CONTENT_PILOT_ENV_FILE=/etc/content-pilot/production.env \
+CONTENT_PILOT_COMPOSE_FILE=/srv/content-pilot/compose.prod.yaml \
+./scripts/deploy.sh
 ```
 
 Скрипт выполняет `docker compose pull`, поднимает PostgreSQL и Redis, один раз
@@ -69,9 +87,9 @@ Watchtower намеренно не используется: обновлени�
 ## Диагностика
 
 ```bash
-docker compose --env-file .env -f compose.prod.yaml ps
-docker compose --env-file .env -f compose.prod.yaml logs -f content-pilot-api
-docker compose --env-file .env -f compose.prod.yaml logs -f content-pilot-worker
+docker compose --env-file .env.production -f compose.prod.yaml ps
+docker compose --env-file .env.production -f compose.prod.yaml logs -f content-pilot-api
+docker compose --env-file .env.production -f compose.prod.yaml logs -f content-pilot-worker
 curl --fail http://127.0.0.1:8000/health
 ```
 
@@ -84,8 +102,7 @@ PostgreSQL data и generated media сохраняются в named volumes. До
 Для rollback укажите предыдущий immutable SHA image:
 
 ```bash
-CONTENT_PILOT_IMAGE=ghcr.io/<github-owner>/content-pilot:sha-<previous-commit> \
-bash scripts/deploy.sh
+CONTENT_PILOT_IMAGE=ghcr.io/<github-owner>/content-pilot:sha-<previous-commit> ./scripts/deploy.sh
 ```
 
 Rollback образа безопасен только при обратной совместимости application code с

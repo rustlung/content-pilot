@@ -145,9 +145,23 @@ Production Compose находится в [`compose.prod.yaml`](compose.prod.yaml
 Watchtower намеренно не используется: обновления должны быть явными и
 наблюдаемыми.
 
-Production `.env` создаётся только на сервере по примеру
+Production `.env.production` создаётся только на сервере по примеру
 [`.env.production.example`](.env.production.example). Не передавайте runtime
 secrets в GitHub Actions: Telegram/VK credentials получает только worker.
+
+Основной production deploy после подготовки server-side `.env.production`:
+
+```bash
+./scripts/deploy.sh
+```
+
+Скрипт по умолчанию использует `.env.production`, `compose.prod.yaml` и
+`CONTENT_PILOT_IMAGE` из этого env-файла. Для разового deploy конкретного
+immutable SHA tag можно переопределить образ через shell:
+
+```bash
+CONTENT_PILOT_IMAGE=ghcr.io/<github-owner>/content-pilot:sha-<commit-sha> ./scripts/deploy.sh
+```
 
 Для ручного remote deploy предусмотрен workflow `Deploy production` с GitHub
 Environment `production`. На GitHub нужно настроить `DEPLOY_HOST`,
@@ -156,7 +170,7 @@ Environment `production`. На GitHub нужно настроить `DEPLOY_HOST
 rollback и GHCR access описаны в [`docs/deployment.md`](docs/deployment.md).
 
 Минимальный rollback: укажите предыдущий `CONTENT_PILOT_IMAGE` с SHA tag и
-снова запустите `bash scripts/deploy.sh`. Automatic Alembic downgrade не
+снова запустите `./scripts/deploy.sh`. Automatic Alembic downgrade не
 выполняется; rollback допустим только при обратной совместимости кода со
 схемой базы данных.
 
