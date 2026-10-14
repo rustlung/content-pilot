@@ -32,6 +32,62 @@ class CeleryBootstrapSettings(BaseSettings):
         return self.celery_broker_url or f"redis://{self.redis_host}:{self.redis_port}/{self.redis_db}"
 
 
+class PublicationSettings(BaseSettings):
+    """Configuration required by Celery publication tasks and publishers only.
+
+    This deliberately excludes database configuration. The worker gets its
+    database session through the session factory, while publisher credentials
+    and retry policy come directly from the runtime environment.
+    """
+
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    app_env: str = "development"
+    publication_max_retries: int = Field(default=3, ge=0)
+    publication_retry_base_seconds: int = Field(default=30, ge=1)
+    publishing_dry_run: bool = False
+    social_http_timeout_seconds: int = Field(default=30, ge=1, le=300)
+    media_root: Path = Path("data/media")
+
+    telegram_bot_token: SecretStr | None = None
+    telegram_chat_id: str | None = None
+    vk_access_token: SecretStr | None = None
+    vk_group_id: str | None = None
+    vk_api_version: str = "5.199"
+
+    @field_validator("vk_api_version", mode="before")
+    @classmethod
+    def default_vk_api_version(cls, value: str | None) -> str:
+        return value or "5.199"
+
+    @field_validator("telegram_bot_token", "vk_access_token", mode="before")
+    @classmethod
+    def empty_secret_is_missing(cls, value: str | None) -> str | None:
+        return value.strip() or None if isinstance(value, str) else value
+
+    @field_validator("telegram_chat_id", "vk_group_id", mode="before")
+    @classmethod
+    def empty_identifier_is_missing(cls, value: str | None) -> str | None:
+        return value.strip() or None if isinstance(value, str) else value
+
+
+class AISettings(BaseSettings):
+    """Configuration required by ProxyAPI-backed AI operations only."""
+
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    proxyapi_api_key: SecretStr | None = None
+    proxyapi_base_url: str = "https://api.proxyapi.ru/v1"
+    ai_text_model: str = "openai/gpt-4.1-mini"
+    ai_image_model: str = "openai/gpt-image-1-mini"
+    ai_timeout_seconds: int = Field(default=60, ge=1, le=300)
+
+    @field_validator("proxyapi_api_key", mode="before")
+    @classmethod
+    def empty_secret_is_missing(cls, value: str | None) -> str | None:
+        return value.strip() or None if isinstance(value, str) else value
+
+
 class Settings(BaseSettings):
     """Runtime settings. Secrets are never included in application logs."""
 

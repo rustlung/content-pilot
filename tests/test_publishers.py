@@ -8,7 +8,7 @@ from urllib.parse import parse_qs
 import httpx
 import pytest
 
-from content_pilot.config import Settings
+from content_pilot.config import PublicationSettings
 from content_pilot.models.enums import Platform
 from content_pilot.models.post import Post
 from content_pilot.publishers.base import (
@@ -23,9 +23,8 @@ from content_pilot.publishers.telegram import TELEGRAM_CAPTION_LIMIT, TelegramPu
 from content_pilot.publishers.vk import VkPublisher
 
 
-def settings(**overrides: object) -> Settings:
+def settings(**overrides: object) -> PublicationSettings:
     values: dict[str, object] = {
-        "postgres_password": "test-password",
         "app_env": "test",
         "telegram_bot_token": "telegram-token",
         "telegram_chat_id": "-100123",
@@ -33,7 +32,7 @@ def settings(**overrides: object) -> Settings:
         "vk_group_id": "42",
     }
     values.update(overrides)
-    return Settings(**values)
+    return PublicationSettings(**values)
 
 
 def post(platform: Platform, text: str = "Тестовый текст") -> Post:

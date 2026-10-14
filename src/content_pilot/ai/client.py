@@ -9,7 +9,7 @@ from pydantic import BaseModel, ValidationError
 
 from content_pilot.ai.prompts import SYSTEM_INSTRUCTION
 from content_pilot.ai.schemas import ContentPlanAI, ImagePromptAI, PostGenerationAI
-from content_pilot.config import Settings
+from content_pilot.config import AISettings
 
 
 class AIError(Exception):
@@ -29,7 +29,7 @@ class AIResponseValidationError(AIError):
 
 
 class AIClient:
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: AISettings) -> None:
         self.settings = settings
 
     def _client(self) -> OpenAI:

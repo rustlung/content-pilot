@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 from typing import Sequence
 
-from content_pilot.config import Settings
+from content_pilot.config import PublicationSettings
 from content_pilot.models.enums import Platform
 from content_pilot.models.post import Post
 from content_pilot.publishers.base import (
@@ -24,7 +24,7 @@ class DryRunPublisher:
         return PublicationResult(f"dry-run:{uuid.uuid4()}")
 
 
-def resolve_publisher(platform: Platform, settings: Settings) -> Publisher:
+def resolve_publisher(platform: Platform, settings: PublicationSettings) -> Publisher:
     if settings.publishing_dry_run and settings.app_env in {"development", "test"}:
         return DryRunPublisher()
     if platform is Platform.TELEGRAM:

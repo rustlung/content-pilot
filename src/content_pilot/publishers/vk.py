@@ -6,7 +6,7 @@ from typing import Any, Iterator, Sequence
 
 import httpx
 
-from content_pilot.config import Settings
+from content_pilot.config import PublicationSettings
 from content_pilot.models.post import Post
 from content_pilot.publishers.base import (
     PublicationMedia,
@@ -18,7 +18,7 @@ from content_pilot.publishers.base import (
 
 
 class VkPublisher:
-    def __init__(self, settings: Settings, http_client: httpx.Client | None = None) -> None:
+    def __init__(self, settings: PublicationSettings, http_client: httpx.Client | None = None) -> None:
         if settings.vk_access_token is None or not settings.vk_group_id:
             raise PublisherUnavailableError("VK publisher is not configured")
         try:

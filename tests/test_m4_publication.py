@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from content_pilot.db.base import Base
+from content_pilot.config import PublicationSettings
 from content_pilot.models.content_item import ContentItem
 from content_pilot.models.enums import Platform, PostStatus, PublicationAttemptStatus
 from content_pilot.models.post import Post
@@ -149,6 +150,7 @@ def test_task_publishes_once_and_duplicate_task_skips(monkeypatch) -> None:
             return publishing.PublicationResult("fake:123")
 
     monkeypatch.setattr(publishing, "get_session_factory", lambda: factory)
+    monkeypatch.setattr(publishing, "get_publication_settings", lambda: PublicationSettings(_env_file=None))
     monkeypatch.setattr(publishing, "resolve_publisher", lambda platform, settings: FakePublisher())
 
     publishing.publish_post.apply(args=[post_id], task_id="task-a").get()

@@ -6,7 +6,7 @@ from typing import Any, Iterator, Sequence
 
 import httpx
 
-from content_pilot.config import Settings
+from content_pilot.config import PublicationSettings
 from content_pilot.models.post import Post
 from content_pilot.publishers.base import (
     PublicationMedia,
@@ -20,7 +20,7 @@ TELEGRAM_CAPTION_LIMIT = 1024
 
 
 class TelegramPublisher:
-    def __init__(self, settings: Settings, http_client: httpx.Client | None = None) -> None:
+    def __init__(self, settings: PublicationSettings, http_client: httpx.Client | None = None) -> None:
         if settings.telegram_bot_token is None or not settings.telegram_chat_id:
             raise PublisherUnavailableError("Telegram publisher is not configured")
         self._token = settings.telegram_bot_token.get_secret_value()

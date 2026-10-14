@@ -1,6 +1,8 @@
 """FastAPI application factory for the ContentPilot foundation."""
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -11,6 +13,8 @@ from content_pilot.web.router import TEMPLATES, router as web_router, template_c
 from content_pilot.ai.client import AIConfigurationError, AIError, AIProviderError, AIResponseValidationError
 from content_pilot.services.errors import ConflictError, NotFoundError, ValidationDomainError
 
+STATIC_ROOT = Path(__file__).parent / "web" / "static"
+
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     """Create the web application without connecting to or mutating the database."""
@@ -18,7 +22,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title=resolved_settings.app_name, debug=resolved_settings.app_debug)
     app.state.settings = resolved_settings
     app.mount("/media", StaticFiles(directory=resolved_settings.media_root, check_dir=False), name="media")
-    app.mount("/static", StaticFiles(directory="src/content_pilot/web/static"), name="static")
+    app.mount("/static", StaticFiles(directory=STATIC_ROOT), name="static")
 
     def error_response(request: Request, status_code: int, title: str, detail: str) -> Response:
         if request.url.path.startswith("/api"):

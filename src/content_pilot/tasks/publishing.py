@@ -8,7 +8,7 @@ from celery import Task
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from content_pilot.config import Settings
+from content_pilot.config import PublicationSettings
 from content_pilot.db.session import get_session_factory
 from content_pilot.models.enums import PostStatus
 from content_pilot.models.post import Post
@@ -32,6 +32,11 @@ from content_pilot.tasks.celery_app import celery_app
 logger = logging.getLogger(__name__)
 
 
+def get_publication_settings() -> PublicationSettings:
+    """Load publisher-only configuration without requiring database credentials."""
+    return PublicationSettings()
+
+
 def _load_post_for_publication(session, post_id: uuid.UUID) -> Post | None:
     return session.scalar(
         select(Post).options(selectinload(Post.media_assets)).where(Post.id == post_id)
@@ -40,7 +45,7 @@ def _load_post_for_publication(session, post_id: uuid.UUID) -> Post | None:
 
 @celery_app.task(bind=True, name="content_pilot.publish_post", max_retries=None)
 def publish_post(self: Task, post_id: str) -> None:
-    settings = Settings()
+    settings = get_publication_settings()
     task_id = self.request.id or "unknown"
     try:
         post_uuid = uuid.UUID(post_id)
