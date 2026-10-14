@@ -123,6 +123,43 @@ docker compose logs -f content-pilot-beat
 docker compose logs -f content-pilot-worker
 ```
 
+## CI/CD и deployment
+
+GitHub Actions выполняет CI для `push` и `pull_request` в `main`: устанавливает
+проект на Python 3.12, запускает pytest, compileall и production Docker build.
+CI не получает production secrets, не вызывает ProxyAPI и не публикует посты.
+
+После успешного CI для trusted `push` в `main` workflow публикации собирает
+образ в GHCR:
+
+```text
+ghcr.io/<github-owner>/content-pilot:latest
+ghcr.io/<github-owner>/content-pilot:sha-<commit-sha>
+```
+
+Для deployment используйте immutable SHA tag, а не только `latest`.
+Production Compose находится в [`compose.prod.yaml`](compose.prod.yaml), а
+серверный helper — в [`scripts/deploy.sh`](scripts/deploy.sh). Он выполняет
+`pull`, поднимает PostgreSQL и Redis, один раз применяет Alembic migration,
+запускает application services и проверяет `/health`.
+Watchtower намеренно не используется: обновления должны быть явными и
+наблюдаемыми.
+
+Production `.env` создаётся только на сервере по примеру
+[`.env.production.example`](.env.production.example). Не передавайте runtime
+secrets в GitHub Actions: Telegram/VK credentials получает только worker.
+
+Для ручного remote deploy предусмотрен workflow `Deploy production` с GitHub
+Environment `production`. На GitHub нужно настроить `DEPLOY_HOST`,
+`DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS`, `DEPLOY_PATH` и при
+необходимости `DEPLOY_PORT`. Подробная инструкция, server prerequisites,
+rollback и GHCR access описаны в [`docs/deployment.md`](docs/deployment.md).
+
+Минимальный rollback: укажите предыдущий `CONTENT_PILOT_IMAGE` с SHA tag и
+снова запустите `bash scripts/deploy.sh`. Automatic Alembic downgrade не
+выполняется; rollback допустим только при обратной совместимости кода со
+схемой базы данных.
+
 ## Настройка социальных интеграций
 
 Telegram использует официальный Bot API. Для постов с изображением, если текст
@@ -148,8 +185,8 @@ VK использует официальный метод сообщества `
   он не используется.
 - На внешней границе публикация имеет семантику at-least-once: успешный ответ
   провайдера перед сбоем worker/базы данных может привести к дублированию при retry.
-- Нет auth, хранения credentials для нескольких пользователей, аналитики вовлечённости
-  в соцсетях и CI/CD.
+- Нет auth, хранения credentials для нескольких пользователей и аналитики
+  вовлечённости в соцсетях.
 
 ## Демо и подготовка к релизу
 

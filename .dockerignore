@@ -1,7 +1,16 @@
 .git
 .env
+.env.*
 .venv
 __pycache__/
 *.py[cod]
 *.egg-info/
+.pytest_cache/
+data/
 scripts/spikes/output/
+scripts/spikes/
+tests/
+docs/
+.github/
+.idea/
+.vscode/

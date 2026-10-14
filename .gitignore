@@ -1,4 +1,7 @@
 .env
+.env.*
+!.env.example
+!.env.production.example
 scripts/spikes/output/
 __pycache__/
 *.py[cod]
