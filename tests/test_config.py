@@ -2,7 +2,7 @@
 import pytest
 from pydantic import ValidationError
 
-from content_pilot.config import Settings
+from content_pilot.config import PublicationSettings, Settings
 
 
 def test_settings_builds_database_url() -> None:
@@ -31,3 +31,19 @@ def test_settings_treats_blank_social_credentials_as_missing() -> None:
     settings = Settings(postgres_password="test-password", telegram_bot_token="", vk_access_token="")
     assert settings.telegram_bot_token is None
     assert settings.vk_access_token is None
+
+
+def test_publication_settings_support_gateway_without_direct_telegram_credentials() -> None:
+    settings = PublicationSettings(
+        _env_file=None,
+        telegram_gateway_base_url="https://gateway.example/",
+        contentpilot_gateway_key="gateway-test-key",
+    )
+    assert settings.telegram_gateway_base_url == "https://gateway.example"
+    assert settings.telegram_bot_token is None
+    assert settings.telegram_chat_id is None
+
+
+def test_publication_settings_reject_non_https_gateway_url() -> None:
+    with pytest.raises(ValidationError, match="HTTPS"):
+        PublicationSettings(_env_file=None, telegram_gateway_base_url="http://gateway.example")

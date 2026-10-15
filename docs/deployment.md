@@ -26,11 +26,13 @@ PostgreSQL и Redis не публикуют порты на host. API по ум�
 - надёжный `POSTGRES_PASSWORD`;
 - `APP_ENV=production`, `APP_DEBUG=false` и `APP_TIMEZONE`;
 - ключ ProxyAPI, если на сервере нужна AI-генерация;
-- Telegram/VK credentials, только если нужна автоматическая публикация;
+- Telegram Gateway key или direct Telegram credentials, а также VK credentials,
+  только если нужна автоматическая публикация;
 - `PUBLISHING_DRY_RUN=false` для реальных публикаций.
 
-`content-pilot-worker` — единственный service, получающий Telegram и VK
-credentials. Celery Beat не получает social secrets.
+`content-pilot-worker` — единственный service, получающий Telegram Gateway key,
+direct Telegram credentials и VK credentials. Celery Beat не получает social
+secrets.
 
 ## Доступ к GHCR
 
@@ -127,8 +129,11 @@ Workflow не отключает `StrictHostKeyChecking` и не выполня�
 
 ## Ограничения сетевых интеграций
 
-- Telegram API из российских сетей может требовать proxy/VPN routing;
-  `TELEGRAM_PROXY_URL` пока не реализован.
+- Direct Telegram Bot API из российских сетей может требовать proxy/VPN routing.
+  Для environments с ограниченным прямым доступом настройте Cloudflare Telegram
+  Gateway через `TELEGRAM_GATEWAY_BASE_URL` и `CONTENTPILOT_GATEWAY_KEY`; эти
+  значения нужны только worker-у. Gateway хранит Bot Token и Channel ID на
+  своей стороне.
 - Автоматическая загрузка изображений в VK ограничена разрешением `photos`;
   ContentPilot публикует текст и оставляет изображение для ручной публикации.
 - LinkedIn остаётся в manual mode.

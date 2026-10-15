@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from functools import cached_property
 from pathlib import Path
+from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import Field, SecretStr, field_validator
@@ -51,6 +52,8 @@ class PublicationSettings(BaseSettings):
 
     telegram_bot_token: SecretStr | None = None
     telegram_chat_id: str | None = None
+    telegram_gateway_base_url: str | None = None
+    contentpilot_gateway_key: SecretStr | None = None
     vk_access_token: SecretStr | None = None
     vk_group_id: str | None = None
     vk_api_version: str = "5.199"
@@ -60,7 +63,7 @@ class PublicationSettings(BaseSettings):
     def default_vk_api_version(cls, value: str | None) -> str:
         return value or "5.199"
 
-    @field_validator("telegram_bot_token", "vk_access_token", mode="before")
+    @field_validator("telegram_bot_token", "contentpilot_gateway_key", "vk_access_token", mode="before")
     @classmethod
     def empty_secret_is_missing(cls, value: str | None) -> str | None:
         return value.strip() or None if isinstance(value, str) else value
@@ -69,6 +72,19 @@ class PublicationSettings(BaseSettings):
     @classmethod
     def empty_identifier_is_missing(cls, value: str | None) -> str | None:
         return value.strip() or None if isinstance(value, str) else value
+
+    @field_validator("telegram_gateway_base_url", mode="before")
+    @classmethod
+    def normalize_gateway_base_url(cls, value: str | None) -> str | None:
+        if not isinstance(value, str):
+            return value
+        normalized = value.strip().rstrip("/")
+        if not normalized:
+            return None
+        parsed = urlsplit(normalized)
+        if parsed.scheme != "https" or not parsed.netloc:
+            raise ValueError("TELEGRAM_GATEWAY_BASE_URL must be an HTTPS URL")
+        return normalized
 
 
 class AISettings(BaseSettings):

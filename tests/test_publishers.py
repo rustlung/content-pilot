@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from json import loads
 from pathlib import Path
 from urllib.parse import parse_qs
 
@@ -44,6 +45,17 @@ def client(handler) -> httpx.Client:
     return httpx.Client(transport=httpx.MockTransport(handler))
 
 
+def gateway_settings(**overrides: object) -> PublicationSettings:
+    values: dict[str, object] = {
+        "telegram_bot_token": None,
+        "telegram_chat_id": None,
+        "telegram_gateway_base_url": "https://gateway.example",
+        "contentpilot_gateway_key": "gateway-test-key",
+    }
+    values.update(overrides)
+    return settings(**values)
+
+
 def test_telegram_text_post_returns_message_identifier() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path.endswith("/sendMessage")
@@ -52,6 +64,20 @@ def test_telegram_text_post_returns_message_identifier() -> None:
 
     result = TelegramPublisher(settings(), client(handler)).publish(post(Platform.TELEGRAM), [])
     assert result.external_post_id == "telegram:-100123:17"
+
+
+def test_telegram_gateway_text_post_uses_json_bearer_auth_without_direct_credentials() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url == "https://gateway.example/contentpilot/sendMessage"
+        assert request.headers["authorization"] == "Bearer gateway-test-key"
+        assert request.headers["content-type"].startswith("application/json")
+        assert loads(request.content) == {"text": "Тестовый текст"}
+        assert b"telegram-token" not in request.content
+        assert b"-100123" not in request.content
+        return httpx.Response(200, json={"ok": True, "message_id": 117})
+
+    result = TelegramPublisher(gateway_settings(), client(handler)).publish(post(Platform.TELEGRAM), [])
+    assert result.external_post_id == "telegram:gateway:117"
 
 
 def test_telegram_image_caption_post(tmp_path: Path) -> None:
@@ -66,6 +92,26 @@ def test_telegram_image_caption_post(tmp_path: Path) -> None:
     media = [PublicationMedia(uuid.uuid4(), "image", image)]
     result = TelegramPublisher(settings(), client(handler)).publish(post(Platform.TELEGRAM), media)
     assert result.external_post_id == "telegram:-100123:18"
+
+
+def test_telegram_gateway_photo_uses_multipart_caption_and_file(tmp_path: Path) -> None:
+    image = tmp_path / "image.png"
+    image.write_bytes(b"gateway-image-bytes")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url == "https://gateway.example/contentpilot/sendPhoto"
+        assert request.headers["authorization"] == "Bearer gateway-test-key"
+        assert request.headers["content-type"].startswith("multipart/form-data")
+        assert b'Content-Disposition: form-data; name="photo"; filename="image.png"' in request.content
+        assert b"gateway-image-bytes" in request.content
+        assert "Тестовый текст".encode() in request.content
+        assert b"telegram-token" not in request.content
+        assert b"-100123" not in request.content
+        return httpx.Response(200, json={"ok": True, "message_id": 118})
+
+    media = [PublicationMedia(uuid.uuid4(), "image", image)]
+    result = TelegramPublisher(gateway_settings(), client(handler)).publish(post(Platform.TELEGRAM), media)
+    assert result.external_post_id == "telegram:gateway:118"
 
 
 def test_telegram_long_text_sends_photo_then_full_message(tmp_path: Path) -> None:
@@ -85,6 +131,23 @@ def test_telegram_long_text_sends_photo_then_full_message(tmp_path: Path) -> Non
     assert result.external_post_id == "telegram:-100123:photo:19:text:20"
 
 
+def test_telegram_gateway_long_text_sends_photo_then_full_message(tmp_path: Path) -> None:
+    image = tmp_path / "image.png"
+    image.write_bytes(b"image")
+    calls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url.path)
+        message_id = 119 if request.url.path.endswith("sendPhoto") else 120
+        return httpx.Response(200, json={"ok": True, "message_id": message_id})
+
+    media = [PublicationMedia(uuid.uuid4(), "image", image)]
+    long_text = "т" * (TELEGRAM_CAPTION_LIMIT + 1)
+    result = TelegramPublisher(gateway_settings(), client(handler)).publish(post(Platform.TELEGRAM, long_text), media)
+    assert calls == ["/contentpilot/sendPhoto", "/contentpilot/sendMessage"]
+    assert result.external_post_id == "telegram:gateway:120"
+
+
 @pytest.mark.parametrize("status", [429, 500])
 def test_telegram_transient_http_failures_are_retryable(status: int) -> None:
     publisher = TelegramPublisher(settings(), client(lambda request: httpx.Response(status, json={})))
@@ -98,6 +161,33 @@ def test_telegram_auth_failure_is_permanent() -> None:
         publisher.publish(post(Platform.TELEGRAM), [])
 
 
+@pytest.mark.parametrize("status", [401, 403])
+def test_telegram_gateway_authorization_failures_are_permanent(status: int) -> None:
+    publisher = TelegramPublisher(gateway_settings(), client(lambda request: httpx.Response(status, json={})))
+    with pytest.raises(PublisherPermanentError):
+        publisher.publish(post(Platform.TELEGRAM), [])
+
+
+@pytest.mark.parametrize("status", [429, 500, 503])
+def test_telegram_gateway_transient_http_failures_are_retryable(status: int) -> None:
+    publisher = TelegramPublisher(gateway_settings(), client(lambda request: httpx.Response(status, json={})))
+    with pytest.raises(PublisherRetryableError):
+        publisher.publish(post(Platform.TELEGRAM), [])
+
+
+@pytest.mark.parametrize(
+    ("telegram_status", "error_type"),
+    [(400, PublisherPermanentError), (403, PublisherPermanentError), (429, PublisherRetryableError), (500, PublisherRetryableError)],
+)
+def test_telegram_gateway_wrapped_telegram_status_is_classified(telegram_status: int, error_type: type[Exception]) -> None:
+    publisher = TelegramPublisher(
+        gateway_settings(),
+        client(lambda request: httpx.Response(502, json={"status": telegram_status})),
+    )
+    with pytest.raises(error_type):
+        publisher.publish(post(Platform.TELEGRAM), [])
+
+
 def test_telegram_timeout_is_retryable() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         raise httpx.ReadTimeout("slow", request=request)
@@ -107,10 +197,51 @@ def test_telegram_timeout_is_retryable() -> None:
         publisher.publish(post(Platform.TELEGRAM), [])
 
 
+def test_telegram_gateway_timeout_is_retryable() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadTimeout("slow", request=request)
+
+    with pytest.raises(PublisherRetryableError):
+        TelegramPublisher(gateway_settings(), client(handler)).publish(post(Platform.TELEGRAM), [])
+
+
 def test_telegram_invalid_response_is_permanent() -> None:
     publisher = TelegramPublisher(settings(), client(lambda request: httpx.Response(200, text="not-json")))
     with pytest.raises(PublisherPermanentError):
         publisher.publish(post(Platform.TELEGRAM), [])
+
+
+@pytest.mark.parametrize("response", [httpx.Response(200, text="not-json"), httpx.Response(200, json={"ok": True})])
+def test_telegram_gateway_invalid_or_incomplete_success_is_permanent(response: httpx.Response) -> None:
+    publisher = TelegramPublisher(gateway_settings(), client(lambda request: response))
+    with pytest.raises(PublisherPermanentError):
+        publisher.publish(post(Platform.TELEGRAM), [])
+
+
+def test_telegram_gateway_long_post_does_not_report_success_when_text_send_fails(tmp_path: Path) -> None:
+    image = tmp_path / "image.png"
+    image.write_bytes(b"image")
+    calls = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return httpx.Response(200, json={"ok": True, "message_id": 121})
+        return httpx.Response(503, json={})
+
+    media = [PublicationMedia(uuid.uuid4(), "image", image)]
+    long_text = "т" * (TELEGRAM_CAPTION_LIMIT + 1)
+    with pytest.raises(PublisherRetryableError):
+        TelegramPublisher(gateway_settings(), client(handler)).publish(post(Platform.TELEGRAM, long_text), media)
+    assert calls == 2
+
+
+def test_telegram_gateway_configuration_requires_complete_gateway_pair() -> None:
+    with pytest.raises(PublisherUnavailableError, match="Gateway key"):
+        TelegramPublisher(gateway_settings(contentpilot_gateway_key=None))
+    with pytest.raises(PublisherUnavailableError, match="Gateway URL"):
+        TelegramPublisher(settings(contentpilot_gateway_key="gateway-test-key"))
 
 
 def test_vk_posts_as_community_and_keeps_media_manual() -> None:

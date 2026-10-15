@@ -113,9 +113,15 @@ worker и Celery Beat поднимаются отдельными сервиса
 PUBLISHING_DRY_RUN=false
 SOCIAL_HTTP_TIMEOUT_SECONDS=30
 
-# Telegram
+# Telegram: выберите один режим.
+# Direct Bot API
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_CHAT_ID=
+
+# Cloudflare Telegram Gateway
+# HTTPS origin; ContentPilot добавляет /contentpilot/sendMessage и /sendPhoto
+TELEGRAM_GATEWAY_BASE_URL=
+CONTENTPILOT_GATEWAY_KEY=
 
 # VK community
 VK_ACCESS_TOKEN=
@@ -204,11 +210,12 @@ rollback и GHCR access описаны в [`docs/deployment.md`](docs/deployment
 
 ## Социальные интеграции
 
-TelegramPublisher использует официальный Telegram Bot API. Для поста с
-изображением текст отправляется caption-ом, если помещается в лимит Telegram;
-иначе publisher отправляет изображение и отдельное полное текстовое сообщение.
-На production homeserver для фактической доставки может потребоваться
-настройка proxy/VPN на уровне сети.
+TelegramPublisher поддерживает два режима: direct Telegram Bot API и Cloudflare
+Telegram Gateway. Gateway получает Bearer key, а Bot Token и Channel ID хранит
+на своей стороне. Для поста с изображением текст отправляется caption-ом, если
+помещается в лимит Telegram; иначе publisher отправляет изображение и отдельное
+полное текстовое сообщение. Gateway рекомендуется для environments, где прямой
+доступ к `api.telegram.org` ограничен сетью.
 
 VK использует официальный метод сообщества `wall.post`. Если у поста есть
 сгенерированное медиа, ContentPilot всё равно публикует текст и оставляет
@@ -226,8 +233,10 @@ LinkedIn не использует API: для этой платформы до�
   проверки Page/аккаунта.
 - VK не загружает изображения автоматически из-за ограничения permission
   `photos`; текстовая публикация при этом не считается ошибкой.
-- Доступ к Telegram Bot API зависит от сети deployment environment. На текущем
-  homeserver прямое соединение ограничено; proxy не реализован в приложении.
+- Direct Telegram Bot API зависит от сети deployment environment. На текущем
+  homeserver прямое соединение ограничено; для публикации используется
+  Cloudflare Telegram Gateway. Gateway URL и Bearer key передаются только
+  worker-у.
 - Нет аутентификации, multi-user режима, хранения пользовательских credentials
   и внешней аналитики вовлечённости.
 - Публикация имеет семантику at-least-once: если provider успел опубликовать
